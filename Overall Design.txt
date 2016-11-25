@@ -1,0 +1,20 @@
+General challenge requirements:
+
+-Complete 2 laps around room
+--1 lap teleop
+--1 lap autonomous
+--either order
+-Move to shooting range
+--teleop or autonomous
+-Shoot wiffle balls at target
+--5 times
+--accuracy counts
+--teleop or autonomous
+
+
+Groups (Design and Construction):
+ Chassis - Marcus, Jeremy, Sophia, Thomas
+ Shooter (Rotary) -
+ Shooter (Pneumatic) -
+
+Programming:
