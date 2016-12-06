@@ -42,6 +42,10 @@ String commandString = "";
 //ShooterPitcher shooterPitcher(iGPIO0, iPWM0, iPWM1);
 //ShooterCannon shooterCannon(iGPIO0, iPWM0, iPWM1);
 
+//  __________________________
+// /                          \
+//(  Setup and Initialization  )
+// \__________________________/
 
 void setup() {
   Serial.begin(9600);
@@ -58,6 +62,11 @@ void setup() {
   }
 }
 
+//  ___________
+// /           \
+//(  Main Loop  )
+// \___________/
+
 void loop() {
   if (isCannon != (digitalRead(iSelect) == HIGH)) {
     isCannon = digitalRead(iSelect) == HIGH;
@@ -68,9 +77,13 @@ void loop() {
       // shooterCannon.reset();
       // shooterPitcher.setup();
     }
-  }
-  
+  } 
 }
+
+//  _____________
+// /             \
+//(  Serial Loop  )
+// \_____________/
 
 void serialEvent() {
   char newChar = null;
@@ -87,7 +100,9 @@ void serialEvent() {
 }
 
 void handleCommandString() {
-  // Commands:
+  // sets function to perform
+  // also delegate quick functions?
+   // Commands:
   // SETMOTORS X,Y[,T]                                // Set motors to speeds [X, Y], optionally for T milliseconds
   // FIRE
   // SETSTART
