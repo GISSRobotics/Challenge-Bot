@@ -1,3 +1,6 @@
+#include <ShooterPitcher.h>
+#include <ShooterCannon.h>
+
 // This file consists of 4 parts:
 // 1. Central framework
 // 2. Chassis/manuvering/sensor control
@@ -16,7 +19,7 @@ const int pinDriveLeft = 0;
 const int pinDriveRight = 0;
 const int pinEncoderLeft = 0;                         // Analog input
 const int pinEncoderRight = 0;                        // Analog input
-const int[3] pinIR = { 0, 0, 0 };                     // Line-following IR sensors (analog inputs)
+const int pinIR[3] = { 0, 0, 0 };                     // Line-following IR sensors (analog inputs)
 const int pinReload = 0;                              // Pressing this pin resets the ammunition count to maxAmmo
 const int pinIndicator = 13;                          // Indicator light
 
@@ -35,17 +38,19 @@ const char cmdEnd = '\n';
 // --<Variable Variables ;) >--
 int ammoRemaining = maxAmmo;
 bool isCannon = false;
-double[] currentPos = { 0, 0 };                       // Current relative position of bot, roughly in meters
-double[] currentVector = { 0, 0 };
-double[] currentMotorSpeeds = { 0, 0 };
-double[] requestedMotorSpeeds = { 0, 0 };
+double currentPos[] = { 0, 0 };                       // Current relative position of bot, roughly in meters
+double currentVector[] = { 0, 0 };
+double currentMotorSpeeds[] = { 0, 0 };
+double requestedMotorSpeeds[] = { 0, 0 };
 String functionRunning = "";
 String commandString = "";
-//ShooterPitcher shooterPitcher(iGPIO0, iPWM0, iPWM1);
-//ShooterCannon shooterCannon(iGPIO0, iPWM0, iPWM1);
+
+// --<Shooters>--
+ShooterPitcher shooterPitcher(iGPIO0, iPWM0, iPWM1);
+ShooterCannon shooterCannon(iGPIO0, iPWM0, iPWM1);
 
 // --<Autonomous Function Specific Variables>--
-double[][] recording = { {0, 0} };
+double recording[512][2] = { {0, 0} };
 int playbackIndex = 0;
 
 //  __________________________
@@ -62,9 +67,9 @@ void setup() {
   pinMode(iSelect, INPUT);
   isCannon = digitalRead(iSelect) == HIGH;
   if (isCannon) {
-    // shooterCannon.setup();
+    shooterCannon.setup();
   } else {
-    // shooterPitcher.setup();
+    shooterPitcher.setup();
   }
 }
 
@@ -77,11 +82,11 @@ void loop() {
   if (isCannon != (digitalRead(iSelect) == HIGH)) {
     isCannon = digitalRead(iSelect) == HIGH;
     if (isCannon) {
-      // shooterPitcher.reset();
-      // shooterCannon.setup();
+      shooterPitcher.reset();
+      shooterCannon.setup();
     } else {
-      // shooterCannon.reset();
-      // shooterPitcher.setup();
+      shooterCannon.reset();
+      shooterPitcher.setup();
     }
   }
   functionLoopBroker();
@@ -94,7 +99,7 @@ void loop() {
 // \_____________/
 
 void serialEvent() {
-  char newChar = null;
+  char newChar;
   while (Serial.available() > 0) {
     newChar = Serial.read();
     if (newChar == cmdEnd) { 
@@ -118,24 +123,24 @@ void handleCommandString() {
   // RECORD START|STOP|GO                         
   // STOP
   // FOLLOW
-  if (commandstring == "STOP") {
+  if (commandString == "STOP") {
     functionRunning = "";
-    requestedMotorSpeeds = { 0, 0 };
+    requestedMotorSpeeds[0] = 0;requestedMotorSpeeds[1] = 0;
   } else if (functionRunning == "") {
-    if (commandString.startsWith("SETMOTOR") {
+    if (commandString.startsWith("SETMOTOR")) {
       // Count commas: if 1, parse for X and Y; if 2, also parse for T
     } else if (commandString == "FIRE" and ammoRemaining > 0) {
       if (isCannon) {
-        //shooterCannon.prepare();
-        //shooterCannon.fire();
+        shooterCannon.prepare();
+        shooterCannon.fire();
       } else {
-        //shooterPitcher.prepare();
-        //shooterPitcher.fire();
+        shooterPitcher.prepare();
+        shooterPitcher.fire();
       }
       ammoRemaining--;
     } else if (commandString == "SETSTART") {
-      currentPos = { 0, 0 };
-      currentVector = { 0, 0 };
+      currentPos[0] = 0;currentPos[1] = 0;
+      currentVector[0] = 0;currentVector[1] = 0;
     } else if (commandString.startsWith("GOTO")) {
       functionRunning = commandString;
     } else if (commandString.startsWith("RECORD")) {
