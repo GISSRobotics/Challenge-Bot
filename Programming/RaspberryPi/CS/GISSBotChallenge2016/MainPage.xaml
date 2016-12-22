@@ -33,6 +33,7 @@
                 <ColumnDefinition Width="Auto"></ColumnDefinition>
                 <ColumnDefinition Width="Auto"></ColumnDefinition>
                 <ColumnDefinition Width="Auto"></ColumnDefinition>
+                <ColumnDefinition Width="Auto"></ColumnDefinition>
             </Grid.ColumnDefinitions>
             <TextBlock x:Name="LeftThumbstickState" Grid.Row="0" Text="Waiting..."/>
             <TextBlock x:Name="RightThumbstickState" Grid.Row="1" Text="Waiting..."/>
