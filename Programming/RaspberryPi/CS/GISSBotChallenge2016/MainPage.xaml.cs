@@ -459,30 +459,4 @@ namespace GISSBotChallenge2016
             return new SoftwareBitmap[] { swBmpL, swBmpR };
         }
     }
-
-    public class ArduinoAmbassador
-    {
-
-        // Class for communicating with Arudino
-        // Can also be used for simulation
-
-        public string buffer = "";
-        public bool isOK = true;
-
-        public ArduinoAmbassador()
-        {
-        }
-
-        public string ReadBuffer()
-        {
-            return "OK 0,0 0,0 0,0 0 0000 5 N";
-        }
-
-        public async void WriteCommand(string command)
-        {
-            string write = command + "\n";
-            await Task.Delay(100);
-        }
-
-    }
 }
