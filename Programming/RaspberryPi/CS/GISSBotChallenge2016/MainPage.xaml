@@ -10,30 +10,34 @@
     <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
         <Grid HorizontalAlignment="Left" Margin="20,0,0,0" VerticalAlignment="Center">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"></RowDefinition>
-                <RowDefinition Height="Auto"></RowDefinition>
-                <RowDefinition Height="Auto"></RowDefinition>
-                <RowDefinition Height="Auto"></RowDefinition>
-                <RowDefinition Height="Auto"></RowDefinition>
-                <RowDefinition Height="Auto"></RowDefinition>
-                <RowDefinition Height="Auto"></RowDefinition>
-                <RowDefinition Height="Auto"></RowDefinition>
-                <RowDefinition Height="Auto"></RowDefinition>
-                <RowDefinition Height="Auto"></RowDefinition>
-                <RowDefinition Height="Auto"></RowDefinition>
-                <RowDefinition Height="Auto"></RowDefinition>
-                <RowDefinition Height="Auto"></RowDefinition>
-                <RowDefinition Height="Auto"></RowDefinition>
-                <RowDefinition Height="Auto"></RowDefinition>
-                <RowDefinition Height="Auto"></RowDefinition>
-                <RowDefinition Height="Auto"></RowDefinition>
-                <RowDefinition Height="Auto"></RowDefinition>
+                <RowDefinition Height="20"></RowDefinition>
+                <RowDefinition Height="20"></RowDefinition>
+                <RowDefinition Height="20"></RowDefinition>
+                <RowDefinition Height="20"></RowDefinition>
+                <RowDefinition Height="20"></RowDefinition>
+                <RowDefinition Height="20"></RowDefinition>
+                <RowDefinition Height="20"></RowDefinition>
+                <RowDefinition Height="20"></RowDefinition>
+                <RowDefinition Height="20"></RowDefinition>
+                <RowDefinition Height="20"></RowDefinition>
+                <RowDefinition Height="20"></RowDefinition>
+                <RowDefinition Height="20"></RowDefinition>
+                <RowDefinition Height="20"></RowDefinition>
+                <RowDefinition Height="20"></RowDefinition>
+                <RowDefinition Height="20"></RowDefinition>
+                <RowDefinition Height="20"></RowDefinition>
+                <RowDefinition Height="20"></RowDefinition>
+                <RowDefinition Height="20"></RowDefinition>
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"></ColumnDefinition>
                 <ColumnDefinition Width="Auto"></ColumnDefinition>
                 <ColumnDefinition Width="Auto"></ColumnDefinition>
                 <ColumnDefinition Width="Auto"></ColumnDefinition>
+<<<<<<< HEAD
+=======
+                <ColumnDefinition Width="Auto"></ColumnDefinition>
+>>>>>>> ab6ef17795b07f7157087fcb8db5fa07703696a3
             </Grid.ColumnDefinitions>
             <TextBlock x:Name="LeftThumbstickState" Grid.Row="0" Text="Waiting..."/>
             <TextBlock x:Name="RightThumbstickState" Grid.Row="1" Text="Waiting..."/>
@@ -63,6 +67,21 @@
             <ScrollViewer Margin="20,0,0,0" Grid.Column="1" Grid.Row="7" Grid.RowSpan="11" Height="200px" VerticalScrollBarVisibility="Visible">
                 <TextBlock x:Name="OutputBuffer"/>
             </ScrollViewer>
+            <CaptureElement Name="CamPreviewControlL" Grid.Column="2" Grid.Row="0" Grid.RowSpan="7" Stretch="Uniform"/>
+            <CaptureElement Name="CamPreviewControlR" Grid.Column="3" Grid.Row="0" Grid.RowSpan="7" Stretch="Uniform"/>
+            <Grid Grid.Column="3" Grid.Row="7" Grid.RowSpan="11">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"></RowDefinition>
+                    <RowDefinition Height="*"></RowDefinition>
+                    <RowDefinition Height="*"></RowDefinition>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"></ColumnDefinition>
+                    <ColumnDefinition Width="*"></ColumnDefinition>
+                    <ColumnDefinition Width="*"></ColumnDefinition>
+                </Grid.ColumnDefinitions>
+                <CaptureElement Name="CamPreviewControl_Ex0" Grid.ColumnSpan="3" Grid.RowSpan="3" Stretch="Uniform"/>
+            </Grid>
             <ScrollViewer Margin="20,0,0,0" Grid.Column="2" Grid.Row="7" Grid.RowSpan="11" Height="200px" VerticalScrollBarVisibility="Visible">
                 <TextBlock x:Name="MotorOutputBuffer"/>
             </ScrollViewer>

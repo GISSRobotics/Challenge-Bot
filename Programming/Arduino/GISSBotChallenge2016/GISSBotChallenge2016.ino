@@ -15,23 +15,23 @@
 // \______________________/
 
 // --<Chassis Pins>--
-const int pinDriveLeft = 0;
-const int pinDriveRight = 0;
+const int pinDriveLeft = 10;
+const int pinDriveRight = 11;
 const int pinEncoderLeft = 0;                         // Analog input
 const int pinEncoderRight = 0;                        // Analog input
-const int pinIR[3] = { 0, 0, 0 };                     // Line-following IR sensors (analog inputs)
-const int pinReload = 0;                              // Pressing this pin resets the ammunition count to maxAmmo
+const int pinIR[3] = { 0, 1, 2 };                     // Line-following IR sensors (analog inputs)
+const int pinReload = 12;                              // Pressing this pin resets the ammunition count to maxAmmo
 const int pinIndicator = 13;                          // Indicator light
 
 // --<Interconnect Pins>--
-const int iSelect = 0;
-const int iGPIO0 = 0;
-const int iPWM0 = 0;
-const int iPWM1 = 0;
+const int iSelect = 4;                                // Selector pin on the connector (pin 2) - tied to ground = ShooterCannon
+const int iGPIO0 = 7;                                 // GPIO pin on the connector (pin 3)
+const int iPWM0 = 5;                                  // PWM pin 0 on the connector (pin 4)
+const int iPWM1 = 6;                                  // PWM pin 1 on the connector (pin 5)
 
 // --<Default Values>--
 const int maxAmmo = 5;
-const int selectPitcher = 0;                          // When iSelect is low, this shooter is installed.
+const int selectPitcher = 0;                          // When iSelect is high, this shooter is installed.
 const int selectCannon = 1;                           // Otherwise, this one is installed
 const char cmdEnd = '\n';
 
@@ -39,18 +39,18 @@ const char cmdEnd = '\n';
 int ammoRemaining = maxAmmo;
 bool isCannon = false;
 double currentPos[] = { 0, 0 };                       // Current relative position of bot, roughly in meters
-double currentVector[] = { 0, 0 };
-double currentMotorSpeeds[] = { 0, 0 };
-double requestedMotorSpeeds[] = { 0, 0 };
-String functionRunning = "";
-String commandString = "";
+double currentVector[] = { 0, 0 };                    // Current relative direction of bot, in degrees
+double currentMotorSpeeds[] = { 0, 0 };               // Current motor duty percentages
+double requestedMotorSpeeds[] = { 0, 0 };             // Requested motor duty percentages
+String functionRunning = "";                          // Name of the currently running auto function
+String commandString = "";                            // Serial input/command buffer
 
 // --<Shooters>--
 ShooterPitcher shooterPitcher(iGPIO0, iPWM0, iPWM1);
 ShooterCannon shooterCannon(iGPIO0, iPWM0, iPWM1);
 
 // --<Autonomous Function Specific Variables>--
-double recording[512][2] = { {0, 0} };
+double recording[512][2] = {};                        // New entries will be added as coordinates once they are different enough while recording
 int playbackIndex = 0;
 
 //  __________________________
@@ -64,8 +64,8 @@ void setup() {
   pinMode(pinDriveRight, OUTPUT);
   pinMode(pinReload, INPUT);
   pinMode(pinIndicator, OUTPUT);
-  pinMode(iSelect, INPUT);
-  isCannon = digitalRead(iSelect) == HIGH;
+  pinMode(iSelect, INPUT_PULLUP);                     // Tied to ground, this input will be LOW, otherwise HIGH
+  isCannon = digitalRead(iSelect) == LOW;             // Check which shooter is installed
   if (isCannon) {
     shooterCannon.setup();
   } else {
@@ -79,8 +79,8 @@ void setup() {
 // \___________/
 
 void loop() {
-  if (isCannon != (digitalRead(iSelect) == HIGH)) {
-    isCannon = digitalRead(iSelect) == HIGH;
+  if (isCannon != (digitalRead(iSelect) == LOW)) {    // Make sure the correct shooter is still installed, otherwise initialize the new one
+    isCannon = digitalRead(iSelect) == LOW;
     if (isCannon) {
       shooterPitcher.reset();
       shooterCannon.setup();
@@ -89,8 +89,8 @@ void loop() {
       shooterPitcher.setup();
     }
   }
-  functionLoopBroker();
-  sendStatus();
+  functionLoopBroker();                               // If there is a running function, call its loop
+  sendStatus();                                       // Send the current status to the RPi
 }
 
 //  _____________
@@ -124,6 +124,9 @@ void handleCommandString() {
   // STOP
   // FOLLOW
   if (commandString == "STOP") {
+    if (functionRunning != "") {
+      autonomousStop();
+    }
     functionRunning = "";
     requestedMotorSpeeds[0] = 0;requestedMotorSpeeds[1] = 0;
   } else if (functionRunning == "") {
@@ -141,17 +144,22 @@ void handleCommandString() {
     } else if (commandString == "SETSTART") {
       currentPos[0] = 0;currentPos[1] = 0;
       currentVector[0] = 0;currentVector[1] = 0;
-    } else if (commandString.startsWith("GOTO")) {
-      functionRunning = commandString;
+    } else if (commandString == "GOTO START") {
+      autonomousStart_GotoStart();
+      functionRunning = "GOTO START";
+    } else if (commandString == "GOTO RANGE") {
+      autonomousStart_GotoRange();
+      functionRunning = "GOTO RANGE";
     } else if (commandString.startsWith("RECORD")) {
       if (commandString.endsWith("START")) {
+        autonomousStart_Record();
         functionRunning = "RECORD";
-      } else if (commandString.endsWith("STOP")) {
-        functionRunning = "";
       } else if (commandString.endsWith("GO")) {
+        autonomousStart_RecordGo();
         functionRunning = "RECORD GO";
       }
     } else if (commandString == "FOLLOW") {
+      autonomousStart_Follow();
       functionRunning = "FOLLOW";
     }
   }
@@ -173,18 +181,56 @@ void functionLoopBroker() {
     autonomousLoop_RecordGo();
   } else if (functionRunning == "FOLLOW") {
     autonomousLoop_Follow();
+  } else {
+    functionRunning = "";
   }
 }
 
 void sendStatus() {
   // Send a status string in the format:
   // [STATUS] [MOTORS] [VECTOR] [POSITION] [SEL] [IR] [AMMO] [RECSTATUS]
-  Serial.print("OK 0,0 0,0 0,0 0 0000 5 N");
+  Serial.print((functionRunning == "") ? "OK " : "WAIT "); // [STATUS]
+  Serial.print(String(currentMotorSpeeds[0])+","+String(currentMotorSpeeds[1])+" "); // [MOTORS]
+  Serial.print(String(currentVector[0])+","+String(currentVector[1])+" "); // [VECTOR]
+  Serial.print(String(currentPos[0])+","+String(currentPos[1])+" "); // [POSITION]
+  Serial.print((isCannon) ? "1 " : "0 "); // [SEL]
+  Serial.print("0000 "); // [IR]
+  Serial.print(String(ammoRemaining)+" "); // [AMMO]
+  Serial.print((functionRunning == "RECORD") ? "R\n" : ((functionRunning == "RECORD GO") ? "P\n" : "N\n")); // [RECSTATUS]
+}
+
+//  _____________________________________
+// /                                     \
+//(  Autonomous Function Starts and Stop  )
+// \_____________________________________/
+
+void autonomousStart_GotoStart() {
+
+}
+
+void autonomousStart_GotoRange() {
+  
+}
+
+void autonomousStart_Record() {
+  digitalWrite(pinIndicator, HIGH);
+}
+
+void autonomousStart_RecordGo() {
+  
+}
+
+void autonomousStart_Follow() {
+  
+}
+
+void autonomousStop() {
+  digitalWrite(pinIndicator, LOW);
 }
 
 //  ___________________________
 // /                           \
-//(  Autonomous function loops  )
+//(  Autonomous Function Loops  )
 // \___________________________/
 
 void autonomousLoop_GotoStart() {
@@ -209,4 +255,9 @@ void autonomousLoop_RecordGo() {
 void autonomousLoop_Follow() {
   
 }
+
+//  __________________
+// /                  \
+//(  Helper Functions  )
+// \__________________/
 

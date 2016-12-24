@@ -4,8 +4,15 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Runtime.InteropServices.WindowsRuntime;
+using Windows.Devices.Enumeration;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
+using Windows.Graphics.Display;
+using Windows.Graphics.Imaging;
+using Windows.Media;
+using Windows.Media.Capture;
+using Windows.Media.MediaProperties;
+using Windows.System.Display;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Controls.Primitives;
@@ -14,10 +21,6 @@ using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Navigation;
 using Windows.Gaming.Input;
-using Windows.Devices;
-using Windows.Devices.Gpio;
-using Windows.Devices.Pwm;
-using Microsoft.IoT.Lightning.Providers;
 
 // The Blank Page item template is documented at http://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
@@ -31,6 +34,10 @@ namespace GISSBotChallenge2016
 
         Gamepad controller;
         DispatcherTimer dispatcherTimer;
+
+        private MediaCapture[] _mediaCapture;
+        private CaptureElement[] _camPreviewControl;
+        private int _camCount;
 
         bool functionRunning = false;
         string functionRunningName = "";
@@ -53,8 +60,8 @@ namespace GISSBotChallenge2016
             if (Gamepad.Gamepads.Count > 0)
             {
                 // Vibrate the controller
-                Task.Delay(1500).ContinueWith(_ => { Gamepad.Gamepads.First().Vibration = new GamepadVibration { LeftMotor = 0.5, RightMotor = 0.5, LeftTrigger = 0.5, RightTrigger = 0.5 }; });
-                Task.Delay(1750).ContinueWith(_ => { Gamepad.Gamepads.First().Vibration = new GamepadVibration { LeftMotor = 0, RightMotor = 0, LeftTrigger = 0, RightTrigger = 0 }; });
+                Task.Delay(2500).ContinueWith(_ => { Gamepad.Gamepads.First().Vibration = new GamepadVibration { LeftMotor = 0.5, RightMotor = 0.5, LeftTrigger = 0.5, RightTrigger = 0.5 }; });
+                Task.Delay(2750).ContinueWith(_ => { Gamepad.Gamepads.First().Vibration = new GamepadVibration { LeftMotor = 0, RightMotor = 0, LeftTrigger = 0, RightTrigger = 0 }; });
             }
 
             Gamepad.GamepadAdded += Gamepad_GamepadAdded;
@@ -64,7 +71,38 @@ namespace GISSBotChallenge2016
             dispatcherTimer = new DispatcherTimer();
             dispatcherTimer.Tick += readGamepad;
             dispatcherTimer.Interval = new TimeSpan(100);
+
+            // Task.Run(async () => { await StartCameraAsync(); });
+            StartCameraAsync();
+
             dispatcherTimer.Start();
+
+        }
+
+        private async Task StartCameraAsync()
+        {
+            try
+            {
+                _camPreviewControl = new CaptureElement[] { CamPreviewControlL, CamPreviewControlR, CamPreviewControl_Ex0 };
+                DeviceInformationCollection vidDevices = await DeviceInformation.FindAllAsync(DeviceClass.VideoCapture);
+                _camCount = vidDevices.Count();
+                _mediaCapture = new MediaCapture[_camCount];
+                for (int i = 0; i < _camCount; i++)
+                {
+                    _mediaCapture[i] = new MediaCapture();
+                    await _mediaCapture[i].InitializeAsync(new MediaCaptureInitializationSettings { VideoDeviceId = vidDevices[i].Id });
+                    _camPreviewControl[i].Source = _mediaCapture[i];
+                    await _mediaCapture[i].StartPreviewAsync();
+                }
+            }
+            catch (Exception e)
+            {
+                ComputeDisplay.Text = e.Message;
+            }
+        }
+
+        private async Task StopCameraAsync()
+        {
 
         }
 
@@ -103,7 +141,7 @@ namespace GISSBotChallenge2016
             }
         }
 
-        private void readGamepad(object sender, object e)
+        private async void readGamepad(object sender, object e)
         {
             if (Gamepad.Gamepads.Count > 0)
             {
@@ -313,8 +351,9 @@ namespace GISSBotChallenge2016
                 {
                     // Aiming right now, so camera is needed
 
-                    // [ Read camera feed ]
-                    // [ Find target ]
+                    // Get Frames
+                    SoftwareBitmap[] camFrames = await captureCamFrame();
+                    // Find target
                     // [ Is target within parameters? ]
                     // [ If not, Define neccesary movement for t milliseconds ]
                     // [ If so, targetSet = true ]
@@ -401,6 +440,19 @@ namespace GISSBotChallenge2016
         private void printArduino(string data)
         {
 
+        }
+
+        private async Task<SoftwareBitmap[]> captureCamFrame()
+        {
+            var lowLagCaptureL = await _mediaCapture[0].PrepareAdvancedPhotoCaptureAsync(ImageEncodingProperties.CreateUncompressed(MediaPixelFormat.Bgra8));
+            var lowLagCaptureR = await _mediaCapture[1].PrepareAdvancedPhotoCaptureAsync(ImageEncodingProperties.CreateUncompressed(MediaPixelFormat.Bgra8));
+            var capturedPhotoL = await lowLagCaptureL.CaptureAsync();
+            var capturedPhotoR = await lowLagCaptureR.CaptureAsync();
+            SoftwareBitmap swBmpL = capturedPhotoL.Frame.SoftwareBitmap;
+            SoftwareBitmap swBmpR = capturedPhotoR.Frame.SoftwareBitmap;
+            await lowLagCaptureL.FinishAsync();
+            await lowLagCaptureR.FinishAsync();
+            return new SoftwareBitmap[] { swBmpL, swBmpR };
         }
     }
 
