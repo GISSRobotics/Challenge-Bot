@@ -23,7 +23,7 @@ namespace GISSBotChallenge2016
             return "OK 0,0 0,0 0,0 0 0000 5 N";
         }
 
-        public async void WriteCommand(string command)
+        public async void WriteCommandAsync(string command)
         {
             string write = command + "\n";
             await Task.Delay(100);

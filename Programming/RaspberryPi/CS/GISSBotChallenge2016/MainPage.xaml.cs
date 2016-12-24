@@ -55,7 +55,6 @@ namespace GISSBotChallenge2016
         public MainPage()
         {
             this.InitializeComponent();
-            this.Loaded += OnLoaded;
 
             if (Gamepad.Gamepads.Count > 0)
             {
@@ -67,16 +66,26 @@ namespace GISSBotChallenge2016
             Gamepad.GamepadAdded += Gamepad_GamepadAdded;
             Gamepad.GamepadRemoved += Gamepad_GamepadRemoved;
 
+            Application.Current.Resuming += Application_ResumingAsync;
+            Application.Current.Suspending += Application_SuspendingAsync;
+
             // Start a loop checking the controller
             dispatcherTimer = new DispatcherTimer();
             dispatcherTimer.Tick += DispatcherTimer_TickAsync;
             dispatcherTimer.Interval = new TimeSpan(100);
 
-            // Task.Run(async () => { await StartCameraAsync(); });
-            StartCameraAsync();
-
             dispatcherTimer.Start();
 
+        }
+
+        private async void Application_ResumingAsync(object sender, object args)
+        {
+            await StartCameraAsync();
+        }
+
+        private async void Application_SuspendingAsync(object sender, object args)
+        {
+            await StopCameraAsync();
         }
 
         private async Task StartCameraAsync()
@@ -104,12 +113,12 @@ namespace GISSBotChallenge2016
 
         private async Task StopCameraAsync()
         {
-
-        }
-
-        private async void OnLoaded(object sender, object e)
-        {
-            // Any async stuff to do on loading
+            for (int i = 0; i < _camCount; i++)
+            {
+                await _mediaCapture[i].StopPreviewAsync();
+                _camPreviewControl[i].Source = null;
+                _mediaCapture[i].Dispose();
+            }
         }
 
         private void Display(string text)
@@ -133,9 +142,9 @@ namespace GISSBotChallenge2016
             {
                 // STOP and set motor speeds to 0
                 Display("Gamepad Removed");
-                sendCommand("STOP");
+                SendCommand_Async("STOP");
                 motorSpeeds = new double[] { 0, 0 };
-                sendCommand("SETMOTORS 0,0");
+                SendCommand_Async("SETMOTORS 0,0");
                 // Not running any functions anymore
                 functionRunning = false;
                 functionRunningName = "";
@@ -200,7 +209,7 @@ namespace GISSBotChallenge2016
                     {
                         functionRunning = true;
                         functionRunningName = "FOLLOW";
-                        sendCommand("FOLLOW");
+                        SendCommand_Async("FOLLOW");
                     }
                     buttonTimes[0] = 0;
                 }
@@ -215,7 +224,7 @@ namespace GISSBotChallenge2016
                     {
                         functionRunning = true;
                         functionRunningName = "GOTO RANGE";
-                        sendCommand("GOTO RANGE");
+                        SendCommand_Async("GOTO RANGE");
                     }
                     buttonTimes[1] = 0;
                 }
@@ -230,7 +239,7 @@ namespace GISSBotChallenge2016
                     {
                         functionRunning = true;
                         functionRunningName = "COMPLETE";
-                        sendCommand("[CompleteSeriesOfCommandsAndAutomation]");
+                        SendCommand_Async("[CompleteSeriesOfCommandsAndAutomation]");
                     }
                     buttonTimes[2] = 0;
                 }
@@ -245,7 +254,7 @@ namespace GISSBotChallenge2016
                     {
                         functionRunning = true;
                         functionRunningName = "AIM THEN FIRE";
-                        sendCommand("[AutoFire5SeriesOfCommandsAndAutomation]");
+                        SendCommand_Async("[AutoFire5SeriesOfCommandsAndAutomation]");
                     }
                     buttonTimes[3] = 0;
                 }
@@ -259,7 +268,7 @@ namespace GISSBotChallenge2016
                     if (!functionRunning && inRange)
                     {
                         // Fire
-                        sendCommand("FIRE");
+                        SendCommand_Async("FIRE");
                     }
                     buttonTimes[4] = 0;
                 }
@@ -274,7 +283,7 @@ namespace GISSBotChallenge2016
                     {
                         functionRunning = true;
                         functionRunningName = "AIM";
-                        sendCommand("[AutoAimSeriesOfCommandsAndAutomation]");
+                        SendCommand_Async("[AutoAimSeriesOfCommandsAndAutomation]");
                     }
                     buttonTimes[5] = 0;
                 }
@@ -290,7 +299,7 @@ namespace GISSBotChallenge2016
                         // Stop
                         functionRunning = false;
                         functionRunningName = "";
-                        sendCommand("STOP");
+                        SendCommand_Async("STOP");
                     }
                     buttonTimes[6] = 0;
                 }
@@ -305,13 +314,13 @@ namespace GISSBotChallenge2016
                     {
                         functionRunning = true;
                         functionRunningName = "RECORD";
-                        sendCommand("RECORD START");
+                        SendCommand_Async("RECORD START");
                     }
                     else if (functionRunningName == "RECORD")
                     {
                         functionRunning = false;
                         functionRunningName = "";
-                        sendCommand("RECORD STOP");
+                        SendCommand_Async("RECORD STOP");
                     }
                     buttonTimes[7] = 0;
                 }
@@ -326,7 +335,7 @@ namespace GISSBotChallenge2016
                     {
                         functionRunning = true;
                         functionRunningName = "RECORD GO";
-                        sendCommand("RECORD GO");
+                        SendCommand_Async("RECORD GO");
                     }
                     buttonTimes[8] = 0;
                 }
@@ -337,7 +346,7 @@ namespace GISSBotChallenge2016
                     if (!functionRunning && buttonTimes[9] == viewButtonLong)
                     {
                         // Set START
-                        sendCommand("SETSTART");
+                        SendCommand_Async("SETSTART");
                     }
                 }
                 else if (buttonTimes[9] > 0)
@@ -346,7 +355,7 @@ namespace GISSBotChallenge2016
                     {
                         functionRunning = true;
                         functionRunningName = "GOTO START";
-                        sendCommand("GOTO START");
+                        SendCommand_Async("GOTO START");
                     }
                     buttonTimes[9] = 0;
                 }
@@ -356,7 +365,7 @@ namespace GISSBotChallenge2016
                     // Aiming right now, so camera is needed
 
                     // Get Frames
-                    SoftwareBitmap[] camFrames = await captureCamFrame();
+                    SoftwareBitmap[] camFrames = await CaptureCamFrameAsync();
                     // Find target
                     // [ Is target within parameters? ]
                     // [ If not, Define neccesary movement for t milliseconds ]
@@ -381,12 +390,12 @@ namespace GISSBotChallenge2016
                         // Use either the left stick Y or the triggers for acceleration value:
                         double acceleration = reading.LeftTrigger - reading.RightTrigger;           // Use triggers
                         //double acceleration = reading.LeftThumbstickY;                              // Use left stick Y
-                        motorSpeeds = computeMotorSpeeds(reading.LeftThumbstickX, acceleration);
+                        motorSpeeds = ComputeMotorSpeeds(reading.LeftThumbstickX, acceleration);
                     }
 
                     if (loopsUntilMotorSend <= 0)
                     {
-                        sendCommand("SETMOTORS " + Math.Round(motorSpeeds[0], 1).ToString() + "," + Math.Round(motorSpeeds[1], 1).ToString());
+                        SendCommand_Async("SETMOTORS " + Math.Round(motorSpeeds[0], 1).ToString() + "," + Math.Round(motorSpeeds[1], 1).ToString());
                         loopsUntilMotorSend = loopsUntilMotorSendReset;
                     }
                     else
@@ -399,7 +408,7 @@ namespace GISSBotChallenge2016
             }
         }
 
-        private double[] computeMotorSpeeds(double steering, double acceleration)
+        private double[] ComputeMotorSpeeds(double steering, double acceleration)
         {
 
             // Improve the steering algorithm!
@@ -423,7 +432,7 @@ namespace GISSBotChallenge2016
             return new double[] { m1 > 1 ? 1 : m1 < -1 ? -1 : m1, m2 > 1 ? 1 : m2 < -1 ? -1 : m2 };
         }
 
-        private async void sendCommand(string command)
+        private async void SendCommand_Async(string command)
         {
             await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
             {
@@ -436,17 +445,12 @@ namespace GISSBotChallenge2016
                     OutputBuffer.Text = command + "\n" + OutputBuffer.Text;
                 }
 
-                arduino.WriteCommand(command);
+                arduino.WriteCommandAsync(command);
 
             });
         }
 
-        private void printArduino(string data)
-        {
-
-        }
-
-        private async Task<SoftwareBitmap[]> captureCamFrame()
+        private async Task<SoftwareBitmap[]> CaptureCamFrameAsync()
         {
             var lowLagCaptureL = await _mediaCapture[0].PrepareAdvancedPhotoCaptureAsync(ImageEncodingProperties.CreateUncompressed(MediaPixelFormat.Bgra8));
             var lowLagCaptureR = await _mediaCapture[1].PrepareAdvancedPhotoCaptureAsync(ImageEncodingProperties.CreateUncompressed(MediaPixelFormat.Bgra8));
