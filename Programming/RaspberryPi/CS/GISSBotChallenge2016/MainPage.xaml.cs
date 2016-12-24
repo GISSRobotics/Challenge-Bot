@@ -69,7 +69,7 @@ namespace GISSBotChallenge2016
 
             // Start a loop checking the controller
             dispatcherTimer = new DispatcherTimer();
-            dispatcherTimer.Tick += readGamepad;
+            dispatcherTimer.Tick += DispatcherTimer_TickAsync;
             dispatcherTimer.Interval = new TimeSpan(100);
 
             // Task.Run(async () => { await StartCameraAsync(); });
@@ -83,9 +83,10 @@ namespace GISSBotChallenge2016
         {
             try
             {
-                _camPreviewControl = new CaptureElement[] { CamPreviewControlL, CamPreviewControlR, CamPreviewControl_Ex0 };
+                _camPreviewControl = new CaptureElement[] { CamPreviewControlL, CamPreviewControlR };
                 DeviceInformationCollection vidDevices = await DeviceInformation.FindAllAsync(DeviceClass.VideoCapture);
                 _camCount = vidDevices.Count();
+                _camCount = _camCount > 2 ? 2 : _camCount;
                 _mediaCapture = new MediaCapture[_camCount];
                 for (int i = 0; i < _camCount; i++)
                 {
@@ -97,7 +98,7 @@ namespace GISSBotChallenge2016
             }
             catch (Exception e)
             {
-                ComputeDisplay.Text = e.Message;
+                OutputBuffer.Text += e.StackTrace;
             }
         }
 
@@ -141,8 +142,11 @@ namespace GISSBotChallenge2016
             }
         }
 
-        private async void readGamepad(object sender, object e)
+        private async void DispatcherTimer_TickAsync(object sender, object e)
         {
+            string arduinoBuffer = arduino.ReadBuffer();
+            ArduinoDisplay.Text = arduinoBuffer;
+
             if (Gamepad.Gamepads.Count > 0)
             {
                 controller = Gamepad.Gamepads.First();                                              // Get the first controller
