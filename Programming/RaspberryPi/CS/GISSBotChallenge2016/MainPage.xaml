@@ -72,18 +72,6 @@
             <Viewbox Grid.Column="4" Grid.Row="0" Grid.RowSpan="18">
                 <CaptureElement Name="CamPreviewControlR" VerticalAlignment="Center" Stretch="Uniform"/>
             </Viewbox>
-            <Grid Grid.Column="3" Grid.Row="7" Grid.RowSpan="11">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="*"></RowDefinition>
-                    <RowDefinition Height="*"></RowDefinition>
-                    <RowDefinition Height="*"></RowDefinition>
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"></ColumnDefinition>
-                    <ColumnDefinition Width="*"></ColumnDefinition>
-                    <ColumnDefinition Width="*"></ColumnDefinition>
-                </Grid.ColumnDefinitions>
-            </Grid>
             <ScrollViewer Margin="20,0,0,0" Grid.Column="2" Grid.Row="0" Grid.RowSpan="18" VerticalScrollBarVisibility="Visible">
                 <TextBlock x:Name="MotorOutputBuffer"/>
             </ScrollViewer>
