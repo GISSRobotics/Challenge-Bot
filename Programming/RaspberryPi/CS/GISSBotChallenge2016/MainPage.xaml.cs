@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Devices.Enumeration;
+using Windows.Devices.SerialCommunication;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
 using Windows.Graphics.Display;
@@ -13,6 +16,7 @@ using Windows.Media;
 using Windows.Media.Capture;
 using Windows.Media.MediaProperties;
 using Windows.System.Display;
+using Windows.Storage.Streams;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Controls.Primitives;
@@ -50,7 +54,8 @@ namespace GISSBotChallenge2016
         int loopsUntilMotorSendReset = 3;
         double[] motorSpeeds = new double[] { 0, 0 };
 
-        ArduinoAmbassador arduino = new ArduinoAmbassador();
+        private SerialHelper _serialHelper;
+        ArduinoAmbassador arduino;
 
         public MainPage()
         {
@@ -69,6 +74,8 @@ namespace GISSBotChallenge2016
             Application.Current.Resuming += Application_ResumingAsync;
             Application.Current.Suspending += Application_SuspendingAsync;
 
+            Application_ResumingAsync(null, null);
+
             // Start a loop checking the controller
             dispatcherTimer = new DispatcherTimer();
             dispatcherTimer.Tick += DispatcherTimer_TickAsync;
@@ -80,6 +87,16 @@ namespace GISSBotChallenge2016
 
         private async void Application_ResumingAsync(object sender, object args)
         {
+            _serialHelper = new SerialHelper();
+            var deviceList = await _serialHelper.GetSerialDevicesAsync();
+            if (deviceList.Count() > 0)
+            {
+                await _serialHelper.InitializeAsync(deviceList.First());
+                arduino = new ArduinoAmbassador(_serialHelper);
+            } else
+            {
+                arduino = new ArduinoAmbassador(null);
+            }
             await StartCameraAsync();
         }
 
@@ -153,8 +170,15 @@ namespace GISSBotChallenge2016
 
         private async void DispatcherTimer_TickAsync(object sender, object e)
         {
-            string arduinoBuffer = arduino.ReadBuffer();
-            ArduinoDisplay.Text = arduinoBuffer;
+            if (arduino != null)
+            {
+                string arduinoStatus = arduino.ReadBufferAndGetStatus();
+                ArduinoDisplay.Text = arduinoStatus;
+                if (arduino.IsSimulator)
+                {
+                    ArduinoDisplay.Text += "\n(Simulator)";
+                }
+            }
 
             if (Gamepad.Gamepads.Count > 0)
             {
@@ -452,15 +476,22 @@ namespace GISSBotChallenge2016
 
         private async Task<SoftwareBitmap[]> CaptureCamFrameAsync()
         {
-            var lowLagCaptureL = await _mediaCapture[0].PrepareAdvancedPhotoCaptureAsync(ImageEncodingProperties.CreateUncompressed(MediaPixelFormat.Bgra8));
-            var lowLagCaptureR = await _mediaCapture[1].PrepareAdvancedPhotoCaptureAsync(ImageEncodingProperties.CreateUncompressed(MediaPixelFormat.Bgra8));
-            var capturedPhotoL = await lowLagCaptureL.CaptureAsync();
-            var capturedPhotoR = await lowLagCaptureR.CaptureAsync();
-            SoftwareBitmap swBmpL = capturedPhotoL.Frame.SoftwareBitmap;
-            SoftwareBitmap swBmpR = capturedPhotoR.Frame.SoftwareBitmap;
-            await lowLagCaptureL.FinishAsync();
-            await lowLagCaptureR.FinishAsync();
-            return new SoftwareBitmap[] { swBmpL, swBmpR };
+            if (_camPreviewControl[0].Source != null)
+            {
+                var lowLagCaptureL = await _mediaCapture[0].PrepareAdvancedPhotoCaptureAsync(ImageEncodingProperties.CreateUncompressed(MediaPixelFormat.Bgra8));
+                var lowLagCaptureR = await _mediaCapture[1].PrepareAdvancedPhotoCaptureAsync(ImageEncodingProperties.CreateUncompressed(MediaPixelFormat.Bgra8));
+                var capturedPhotoL = await lowLagCaptureL.CaptureAsync();
+                var capturedPhotoR = await lowLagCaptureR.CaptureAsync();
+                SoftwareBitmap swBmpL = capturedPhotoL.Frame.SoftwareBitmap;
+                SoftwareBitmap swBmpR = capturedPhotoR.Frame.SoftwareBitmap;
+                await lowLagCaptureL.FinishAsync();
+                await lowLagCaptureR.FinishAsync();
+                return new SoftwareBitmap[] { swBmpL, swBmpR };
+            }
+            else
+            {
+                return null;
+            }
         }
     }
 }
