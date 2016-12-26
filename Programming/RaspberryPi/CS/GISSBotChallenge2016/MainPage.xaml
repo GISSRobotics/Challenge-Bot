@@ -33,7 +33,6 @@
                 <ColumnDefinition Width="*"></ColumnDefinition>
                 <ColumnDefinition Width="*"></ColumnDefinition>
                 <ColumnDefinition Width="2*"></ColumnDefinition>
-                <ColumnDefinition Width="2*"></ColumnDefinition>
             </Grid.ColumnDefinitions>
             <TextBlock x:Name="LeftThumbstickState" Grid.Row="0" Text="Waiting..."/>
             <TextBlock x:Name="RightThumbstickState" Grid.Row="1" Text="Waiting..."/>
@@ -67,10 +66,7 @@
             </ScrollViewer>
             <TextBlock x:Name="MotorOutputBuffer" Margin="20,0,0,0" Grid.Column="1" Grid.Row="16"/>
             <Viewbox Grid.Column="2" Grid.Row="0" Grid.RowSpan="18">
-            <CaptureElement Name="CamPreviewControlL" VerticalAlignment="Center" Stretch="Uniform"/>
-            </Viewbox>
-            <Viewbox Grid.Column="3" Grid.Row="0" Grid.RowSpan="18">
-                <CaptureElement Name="CamPreviewControlR" VerticalAlignment="Center" Stretch="Uniform"/>
+                <CaptureElement Name="CamPreviewControl" VerticalAlignment="Center" Stretch="Uniform"/>
             </Viewbox>
         </Grid>
     </Grid>

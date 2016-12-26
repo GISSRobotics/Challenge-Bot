@@ -39,9 +39,8 @@ namespace GISSBotChallenge2016
         Gamepad controller;
         DispatcherTimer dispatcherTimer;
 
-        private MediaCapture[] _mediaCapture;
-        private CaptureElement[] _camPreviewControl;
-        private int _camCount;
+        private MediaCapture _mediaCapture;
+        private CaptureElement _camPreviewControl;
 
         bool functionRunning = false;
         string functionRunningName = "";
@@ -109,18 +108,11 @@ namespace GISSBotChallenge2016
         {
             try
             {
-                _camPreviewControl = new CaptureElement[] { CamPreviewControlL, CamPreviewControlR };
                 DeviceInformationCollection vidDevices = await DeviceInformation.FindAllAsync(DeviceClass.VideoCapture);
-                _camCount = vidDevices.Count();
-                _camCount = _camCount > 2 ? 2 : _camCount;
-                _mediaCapture = new MediaCapture[_camCount];
-                for (int i = 0; i < _camCount; i++)
-                {
-                    _mediaCapture[i] = new MediaCapture();
-                    await _mediaCapture[i].InitializeAsync(new MediaCaptureInitializationSettings { VideoDeviceId = vidDevices[i].Id });
-                    _camPreviewControl[i].Source = _mediaCapture[i];
-                    await _mediaCapture[i].StartPreviewAsync();
-                }
+                _mediaCapture = new MediaCapture();
+                await _mediaCapture.InitializeAsync(new MediaCaptureInitializationSettings { VideoDeviceId = vidDevices[0].Id });
+                _camPreviewControl.Source = _mediaCapture;
+                await _mediaCapture.StartPreviewAsync();
             }
             catch (Exception e)
             {
@@ -130,12 +122,9 @@ namespace GISSBotChallenge2016
 
         private async Task StopCameraAsync()
         {
-            for (int i = 0; i < _camCount; i++)
-            {
-                await _mediaCapture[i].StopPreviewAsync();
-                _camPreviewControl[i].Source = null;
-                _mediaCapture[i].Dispose();
-            }
+            await _mediaCapture.StopPreviewAsync();
+            _camPreviewControl.Source = null;
+            _mediaCapture.Dispose();
         }
 
         private void Display(string text)
@@ -389,8 +378,12 @@ namespace GISSBotChallenge2016
                     // Aiming right now, so camera is needed
 
                     // Get Frames
-                    SoftwareBitmap[] camFrames = await CaptureCamFrameAsync();
+                    SoftwareBitmap camFrame = await CaptureCamFrameAsync();
                     // Find target
+                    //  Get distribution of specified colour
+                    //  Is distribution specific or not?
+                    //  Find epicenter of distribution (median?/mean?)
+                    //  Draw epicenter on display
                     // [ Is target within parameters? ]
                     // [ If not, Define neccesary movement for t milliseconds ]
                     // [ If so, targetSet = true ]
@@ -399,6 +392,8 @@ namespace GISSBotChallenge2016
                     //  check arduino ammo, if any left then fire/
                     //  if none left, end funtion
                     //  if fired, continue function and loop again to ensure aim is still good
+                    // otherwise:
+                    //  end function
                 }
                 else
                 {
@@ -476,19 +471,15 @@ namespace GISSBotChallenge2016
             arduino.WriteCommandAsync(command);
         }
 
-        private async Task<SoftwareBitmap[]> CaptureCamFrameAsync()
+        private async Task<SoftwareBitmap> CaptureCamFrameAsync()
         {
-            if (_camPreviewControl[0].Source != null)
+            if (_camPreviewControl.Source != null)
             {
-                var lowLagCaptureL = await _mediaCapture[0].PrepareAdvancedPhotoCaptureAsync(ImageEncodingProperties.CreateUncompressed(MediaPixelFormat.Bgra8));
-                var lowLagCaptureR = await _mediaCapture[1].PrepareAdvancedPhotoCaptureAsync(ImageEncodingProperties.CreateUncompressed(MediaPixelFormat.Bgra8));
-                var capturedPhotoL = await lowLagCaptureL.CaptureAsync();
-                var capturedPhotoR = await lowLagCaptureR.CaptureAsync();
-                SoftwareBitmap swBmpL = capturedPhotoL.Frame.SoftwareBitmap;
-                SoftwareBitmap swBmpR = capturedPhotoR.Frame.SoftwareBitmap;
-                await lowLagCaptureL.FinishAsync();
-                await lowLagCaptureR.FinishAsync();
-                return new SoftwareBitmap[] { swBmpL, swBmpR };
+                var lowLagCapture = await _mediaCapture.PrepareAdvancedPhotoCaptureAsync(ImageEncodingProperties.CreateUncompressed(MediaPixelFormat.Bgra8));
+                var capturedPhoto = await lowLagCapture.CaptureAsync();
+                SoftwareBitmap swBmp = capturedPhoto.Frame.SoftwareBitmap;
+                await lowLagCapture.FinishAsync();
+                return swBmp;
             }
             else
             {
