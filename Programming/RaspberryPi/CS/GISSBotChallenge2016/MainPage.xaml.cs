@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Devices.Enumeration;
 using Windows.Devices.SerialCommunication;
@@ -17,12 +18,14 @@ using Windows.Media.Capture;
 using Windows.Media.MediaProperties;
 using Windows.System.Display;
 using Windows.Storage.Streams;
+using Windows.UI;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Controls.Primitives;
 using Windows.UI.Xaml.Data;
 using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Media;
+using Windows.UI.Xaml.Media.Imaging;
 using Windows.UI.Xaml.Navigation;
 using Windows.Gaming.Input;
 
@@ -30,6 +33,16 @@ using Windows.Gaming.Input;
 
 namespace GISSBotChallenge2016
 {
+    // Interop initialization
+    // (used for CV)
+    [ComImport]
+    [Guid("5B0D3235-4DBA-4D44-865E-8F1D0E4FD04D")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    unsafe interface IMemoryBufferByteAccess
+    {
+        void GetBuffer(out byte* buffer, out uint capacity);
+    }
+
     /// <summary>
     /// An empty page that can be used on its own or navigated to within a Frame.
     /// </summary>
@@ -40,7 +53,6 @@ namespace GISSBotChallenge2016
         DispatcherTimer dispatcherTimer;
 
         private MediaCapture _mediaCapture;
-        private CaptureElement _camPreviewControl;
 
         bool functionRunning = false;
         string functionRunningName = "";
@@ -52,6 +64,10 @@ namespace GISSBotChallenge2016
         int loopsUntilMotorSend = 0;
         int loopsUntilMotorSendReset = 3;
         double[] motorSpeeds = new double[] { 0, 0 };
+
+        Color sCol = Color.FromArgb(255, 140, 35, 10);  // Targeting search colour
+        int[] sTol = new int[] { 24, 10, 10 };          // Search colour tolerances (RGB)
+        int sSparcity = 2;                              // Spacing of pixels to search (higher = faster, lower = more accurate)
 
         private SerialHelper _serialHelper;
         ArduinoAmbassador arduino;
@@ -101,7 +117,14 @@ namespace GISSBotChallenge2016
 
         private async void Application_SuspendingAsync(object sender, object args)
         {
-            await StopCameraAsync();
+            try
+            {
+                await StopCameraAsync();
+            }
+            catch (Exception e)
+            {
+                // do nothing else yet
+            }
         }
 
         private async Task StartCameraAsync()
@@ -110,20 +133,21 @@ namespace GISSBotChallenge2016
             {
                 DeviceInformationCollection vidDevices = await DeviceInformation.FindAllAsync(DeviceClass.VideoCapture);
                 _mediaCapture = new MediaCapture();
-                await _mediaCapture.InitializeAsync(new MediaCaptureInitializationSettings { VideoDeviceId = vidDevices[0].Id });
-                _camPreviewControl.Source = _mediaCapture;
+                await _mediaCapture.InitializeAsync(new MediaCaptureInitializationSettings { VideoDeviceId = vidDevices[1].Id });
+                CamPreviewControl.Source = _mediaCapture;
                 await _mediaCapture.StartPreviewAsync();
             }
             catch (Exception e)
             {
                 OutputBuffer.Text += e.StackTrace;
+                Debug.WriteLine(e);
             }
         }
 
         private async Task StopCameraAsync()
         {
             await _mediaCapture.StopPreviewAsync();
-            _camPreviewControl.Source = null;
+            CamPreviewControl.Source = null;
             _mediaCapture.Dispose();
         }
 
@@ -378,9 +402,46 @@ namespace GISSBotChallenge2016
                     // Aiming right now, so camera is needed
 
                     // Get Frames
+                    // For some reason, this doesn't seem to always work!
                     SoftwareBitmap camFrame = await CaptureCamFrameAsync();
+                    if (camFrame != null)
+                    {
+                        int[,] distributionArray;
+                        int dAPointer = 0;
+                        int[] size;
+                        using (BitmapBuffer buffer = camFrame.LockBuffer(BitmapBufferAccessMode.ReadWrite))
+                        {
+                            size = GetBitmapSize(buffer);
+                            distributionArray = new int[size[0]*size[1]*2, 2];
+                            for (int x=0; x < size[0]; x+=sSparcity)
+                            {
+                                for (int y = 0; y < size[1]; y+=sSparcity)
+                                {
+                                    Color col = GetPixelColor(buffer, x, y);
+                                    if (Math.Abs(col.R-sCol.R) <= sTol[0] && Math.Abs(col.G-sCol.G) <= sTol[1] && Math.Abs(col.B-sCol.B) <= sTol[2])
+                                    {
+                                        distributionArray[dAPointer, 0] = x;
+                                        distributionArray[dAPointer, 1] = y;
+                                        dAPointer++;
+                                    }
+                                }
+                            }
+                        }
+                        CamOverlayControl.Source = null;
+                        SoftwareBitmap overlaySwbm = new SoftwareBitmap(BitmapPixelFormat.Bgra8, size[0], size[1], BitmapAlphaMode.Premultiplied);
+                        using (BitmapBuffer buffer = overlaySwbm.LockBuffer(BitmapBufferAccessMode.ReadWrite))
+                        {
+                            for (int p = dAPointer;p>=0;p--)
+                            {
+                                Color oCol = ColorHelper.FromArgb(255, (byte)(255 - sCol.R), (byte)(255 - sCol.G), (byte)(255 - sCol.B));
+                                SetPixelColor(buffer, distributionArray[p, 0], distributionArray[p, 1], oCol);
+                            }
+                        }
+                        var source = new SoftwareBitmapSource();
+                        await source.SetBitmapAsync(overlaySwbm);
+                        CamOverlayControl.Source = source;
+                    }
                     // Find target
-                    //  Get distribution of specified colour
                     //  Is distribution specific or not?
                     //  Find epicenter of distribution (median?/mean?)
                     //  Draw epicenter on display
@@ -473,17 +534,70 @@ namespace GISSBotChallenge2016
 
         private async Task<SoftwareBitmap> CaptureCamFrameAsync()
         {
-            if (_camPreviewControl.Source != null)
+            try
             {
-                var lowLagCapture = await _mediaCapture.PrepareAdvancedPhotoCaptureAsync(ImageEncodingProperties.CreateUncompressed(MediaPixelFormat.Bgra8));
-                var capturedPhoto = await lowLagCapture.CaptureAsync();
-                SoftwareBitmap swBmp = capturedPhoto.Frame.SoftwareBitmap;
-                await lowLagCapture.FinishAsync();
-                return swBmp;
+                if (CamPreviewControl.Source != null)
+                {
+                    var lowLagCapture = await _mediaCapture.PrepareLowLagPhotoCaptureAsync(ImageEncodingProperties.CreateUncompressed(MediaPixelFormat.Bgra8));
+                    var capturedPhoto = await lowLagCapture.CaptureAsync();
+                    SoftwareBitmap swBmp = capturedPhoto.Frame.SoftwareBitmap;
+                    await lowLagCapture.FinishAsync();
+                    return swBmp;
+                }
+                else
+                {
+                    return null;
+                }
             }
-            else
+            catch (Exception e)
             {
                 return null;
+            }
+        }
+
+
+        // BitmapBuffer helpers
+
+        private int[] GetBitmapSize(BitmapBuffer buffer)
+        {
+            BitmapPlaneDescription bufferLayout = buffer.GetPlaneDescription(0);
+            return new int[] { bufferLayout.Width, bufferLayout.Height };
+        }
+        
+        private unsafe Color GetPixelColor(BitmapBuffer buffer, int x, int y)
+        {
+            BitmapPlaneDescription bufferLayout = buffer.GetPlaneDescription(0);
+            Color color = new Color();
+            if (x >= 0 && x < bufferLayout.Width && y >= 0 && y < bufferLayout.Height)
+            {
+                using (IMemoryBufferReference reference = buffer.CreateReference())
+                {
+                    ((IMemoryBufferByteAccess)reference).GetBuffer(out byte* bufferData, out uint capacity);
+
+                    color.B = bufferData[bufferLayout.StartIndex + bufferLayout.Stride * y + 4 * x + 0];
+                    color.G = bufferData[bufferLayout.StartIndex + bufferLayout.Stride * y + 4 * x + 1];
+                    color.R = bufferData[bufferLayout.StartIndex + bufferLayout.Stride * y + 4 * x + 2];
+                    color.A = bufferData[bufferLayout.StartIndex + bufferLayout.Stride * y + 4 * x + 3];
+                }
+            }
+
+            return color;
+        }
+
+        private unsafe void SetPixelColor(BitmapBuffer buffer, int x, int y, Color color)
+        {
+            BitmapPlaneDescription bufferLayout = buffer.GetPlaneDescription(0);
+            if (x >= 0 && x < bufferLayout.Width && y >= 0 && y < bufferLayout.Height)
+            {
+                using (IMemoryBufferReference reference = buffer.CreateReference())
+                {
+                    ((IMemoryBufferByteAccess)reference).GetBuffer(out byte* bufferData, out uint capacity);
+
+                    bufferData[bufferLayout.StartIndex + bufferLayout.Stride * y + 4 * x + 0] = color.B;
+                    bufferData[bufferLayout.StartIndex + bufferLayout.Stride * y + 4 * x + 1] = color.G;
+                    bufferData[bufferLayout.StartIndex + bufferLayout.Stride * y + 4 * x + 2] = color.R;
+                    bufferData[bufferLayout.StartIndex + bufferLayout.Stride * y + 4 * x + 3] = color.A;
+                }
             }
         }
     }

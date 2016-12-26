@@ -68,6 +68,9 @@
             <Viewbox Grid.Column="2" Grid.Row="0" Grid.RowSpan="18">
                 <CaptureElement Name="CamPreviewControl" VerticalAlignment="Center" Stretch="Uniform"/>
             </Viewbox>
+            <Viewbox Grid.Column="2" Grid.Row="0" Grid.RowSpan="18">
+                <Image Name="CamOverlayControl" VerticalAlignment="Center" Stretch="Uniform"/>
+            </Viewbox>
         </Grid>
     </Grid>
 </Page>
