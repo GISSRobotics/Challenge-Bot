@@ -65,9 +65,9 @@ namespace GISSBotChallenge2016
         int loopsUntilMotorSendReset = 3;
         double[] motorSpeeds = new double[] { 0, 0 };
 
-        Color sCol = Color.FromArgb(255, 140, 35, 10);  // Targeting search colour
-        int[] sTol = new int[] { 24, 10, 10 };          // Search colour tolerances (RGB)
-        int sSparcity = 2;                              // Spacing of pixels to search (higher = faster, lower = more accurate)
+        Color sCol = Color.FromArgb(255, 0, 0, 0);  // Targeting search colour
+        int[] sTol = new int[] { 32, 32, 32 };          // Search colour tolerances (RGB)
+        int sSparcity = 4;                              // Spacing of pixels to search (higher = faster, lower = more accurate)
 
         private SerialHelper _serialHelper;
         ArduinoAmbassador arduino;
@@ -133,7 +133,7 @@ namespace GISSBotChallenge2016
             {
                 DeviceInformationCollection vidDevices = await DeviceInformation.FindAllAsync(DeviceClass.VideoCapture);
                 _mediaCapture = new MediaCapture();
-                await _mediaCapture.InitializeAsync(new MediaCaptureInitializationSettings { VideoDeviceId = vidDevices[1].Id });
+                await _mediaCapture.InitializeAsync(new MediaCaptureInitializationSettings { VideoDeviceId = vidDevices[0].Id });
                 CamPreviewControl.Source = _mediaCapture;
                 await _mediaCapture.StartPreviewAsync();
             }
@@ -412,13 +412,13 @@ namespace GISSBotChallenge2016
                         using (BitmapBuffer buffer = camFrame.LockBuffer(BitmapBufferAccessMode.ReadWrite))
                         {
                             size = GetBitmapSize(buffer);
-                            distributionArray = new int[size[0]*size[1]*2, 2];
-                            for (int x=0; x < size[0]; x+=sSparcity)
+                            distributionArray = new int[size[0] * size[1] * 2, 2];
+                            for (int x = 0; x < size[0]; x += sSparcity)
                             {
-                                for (int y = 0; y < size[1]; y+=sSparcity)
+                                for (int y = 0; y < size[1]; y += sSparcity)
                                 {
                                     Color col = GetPixelColor(buffer, x, y);
-                                    if (Math.Abs(col.R-sCol.R) <= sTol[0] && Math.Abs(col.G-sCol.G) <= sTol[1] && Math.Abs(col.B-sCol.B) <= sTol[2])
+                                    if (Math.Abs(col.R - sCol.R) <= sTol[0] && Math.Abs(col.G - sCol.G) <= sTol[1] && Math.Abs(col.B - sCol.B) <= sTol[2])
                                     {
                                         distributionArray[dAPointer, 0] = x;
                                         distributionArray[dAPointer, 1] = y;
@@ -427,14 +427,31 @@ namespace GISSBotChallenge2016
                                 }
                             }
                         }
+
+                        int[] xDist = new int[dAPointer + 1];
+                        int[] yDist = new int[dAPointer + 1];
                         CamOverlayControl.Source = null;
                         SoftwareBitmap overlaySwbm = new SoftwareBitmap(BitmapPixelFormat.Bgra8, size[0], size[1], BitmapAlphaMode.Premultiplied);
                         using (BitmapBuffer buffer = overlaySwbm.LockBuffer(BitmapBufferAccessMode.ReadWrite))
                         {
-                            for (int p = dAPointer;p>=0;p--)
+                            for (int p = dAPointer; p >= 0; p--)
                             {
                                 Color oCol = ColorHelper.FromArgb(255, (byte)(255 - sCol.R), (byte)(255 - sCol.G), (byte)(255 - sCol.B));
                                 SetPixelColor(buffer, distributionArray[p, 0], distributionArray[p, 1], oCol);
+                                xDist[p] = distributionArray[p, 0];
+                                yDist[p] = distributionArray[p, 1];
+                            }
+                            int xAvg = (int)Math.Round(xDist.Average());
+                            int yAvg = (int)Math.Round(yDist.Average());
+                            ComputeDisplay.Text = xAvg.ToString() + "," + yAvg.ToString();
+                            for (int x = xAvg - 4; x < xAvg + 4 && x < size[0]; x++)
+                            {
+                                if (x < 0) { continue; }
+                                for (int y = yAvg - 4; y < yAvg + 4 && y < size[1]; y++)
+                                {
+                                    if (y < 0) { continue; }
+                                    SetPixelColor(buffer, x, y, Colors.Red);
+                                }
                             }
                         }
                         var source = new SoftwareBitmapSource();
@@ -536,7 +553,7 @@ namespace GISSBotChallenge2016
         {
             try
             {
-                if (CamPreviewControl.Source != null)
+                if (_mediaCapture != null)
                 {
                     var lowLagCapture = await _mediaCapture.PrepareLowLagPhotoCaptureAsync(ImageEncodingProperties.CreateUncompressed(MediaPixelFormat.Bgra8));
                     var capturedPhoto = await lowLagCapture.CaptureAsync();
