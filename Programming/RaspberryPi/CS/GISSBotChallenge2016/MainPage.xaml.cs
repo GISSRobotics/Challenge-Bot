@@ -411,15 +411,21 @@ namespace GISSBotChallenge2016
                     }
                     else
                     {
+                        // Once done, remove rounding!
+                        double steering = reading.LeftThumbstickX;
                         // Use either the left stick Y or the triggers for acceleration value:
                         double acceleration = reading.LeftTrigger - reading.RightTrigger;           // Use triggers
                         //double acceleration = reading.LeftThumbstickY;                              // Use left stick Y
-                        motorSpeeds = ComputeMotorSpeeds(reading.LeftThumbstickX, acceleration);
+                        // Remove sensitivity around 0 zones
+                        double zoneRadius = 0.1;
+                        steering = -zoneRadius < steering && steering < zoneRadius ? 0 : steering;
+                        acceleration = -zoneRadius < acceleration && acceleration < zoneRadius ? 0 : acceleration;
+                        motorSpeeds = ComputeMotorSpeeds(steering, acceleration, buttons.HasFlag(GamepadButtons.LeftThumbstick) ? 0.5 : 1);
                     }
 
                     if (loopsUntilMotorSend <= 0)
                     {
-                        SendCommand_Async("SETMOTORS " + Math.Round(motorSpeeds[0], 1).ToString() + "," + Math.Round(motorSpeeds[1], 1).ToString());
+                        SendCommand_Async("SETMOTORS " + Math.Round(motorSpeeds[0], 2).ToString() + "," + Math.Round(motorSpeeds[1], 2).ToString());
                         loopsUntilMotorSend = loopsUntilMotorSendReset;
                     }
                     else
@@ -432,28 +438,25 @@ namespace GISSBotChallenge2016
             }
         }
 
-        private double[] ComputeMotorSpeeds(double steering, double acceleration)
+        private double[] ComputeMotorSpeeds(double steering, double acceleration, double sensitivity)
         {
+            double leftMotor = steering;
+            double rightMotor = -steering;
 
-            // Improve the steering algorithm!
+            leftMotor += acceleration;
+            rightMotor += acceleration;
 
-            // Need to combine pivoting with moving & steering
-
-            double sensitivity = 1;
-            steering = steering * sensitivity;
-            double m1 = 0;
-            double m2 = 0;
-            if (acceleration >= 0)
+            if (acceleration < -0.5)
             {
-                m1 = acceleration + steering;
-                m2 = acceleration - steering;
+                double swap = leftMotor;
+                leftMotor = rightMotor;
+                rightMotor = swap;
             }
-            else
-            {
-                m1 = acceleration - steering;
-                m2 = acceleration + steering;
-            }
-            return new double[] { m1 > 1 ? 1 : m1 < -1 ? -1 : m1, m2 > 1 ? 1 : m2 < -1 ? -1 : m2 };
+
+            leftMotor = leftMotor > sensitivity ? sensitivity : leftMotor < -sensitivity ? -sensitivity : leftMotor;
+            rightMotor = rightMotor > sensitivity ? sensitivity : rightMotor <= -sensitivity ? -sensitivity : rightMotor;
+
+            return new double[] { leftMotor, rightMotor };
         }
 
         private async void SendCommand_Async(string command)
@@ -462,16 +465,15 @@ namespace GISSBotChallenge2016
             {
                 if (command.StartsWith("SETMOTORS"))
                 {
-                    MotorOutputBuffer.Text = command + "\n" + MotorOutputBuffer.Text;
+                    MotorOutputBuffer.Text = command;
                 }
                 else
                 {
                     OutputBuffer.Text = command + "\n" + OutputBuffer.Text;
                 }
-
-                arduino.WriteCommandAsync(command);
-
             });
+
+            arduino.WriteCommandAsync(command);
         }
 
         private async Task<SoftwareBitmap[]> CaptureCamFrameAsync()
