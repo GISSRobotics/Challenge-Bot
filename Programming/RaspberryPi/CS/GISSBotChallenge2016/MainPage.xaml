@@ -8,7 +8,7 @@
     mc:Ignorable="d">
 
     <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
-        <Grid Margin="20,0,0,0">
+        <Grid Margin="20,20,20,20">
             <Grid.RowDefinitions>
                 <RowDefinition Height="*"></RowDefinition>
                 <RowDefinition Height="*"></RowDefinition>
@@ -31,10 +31,9 @@
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"></ColumnDefinition>
+                <ColumnDefinition Width="*"></ColumnDefinition>
                 <ColumnDefinition Width="2*"></ColumnDefinition>
                 <ColumnDefinition Width="2*"></ColumnDefinition>
-                <ColumnDefinition Width="4*"></ColumnDefinition>
-                <ColumnDefinition Width="4*"></ColumnDefinition>
             </Grid.ColumnDefinitions>
             <TextBlock x:Name="LeftThumbstickState" Grid.Row="0" Text="Waiting..."/>
             <TextBlock x:Name="RightThumbstickState" Grid.Row="1" Text="Waiting..."/>
@@ -63,30 +62,16 @@
             <TextBlock Grid.Column="1" Grid.Row="6" Text="Arduino Status:"/>
             <TextBlock x:Name="ArduinoDisplay" Grid.Column="1" Grid.Row="7"/>
             <TextBlock Grid.Column="1" Grid.Row="8" Text="Outputs:"/>
-            <ScrollViewer Margin="10,0,0,0" Grid.Column="1" Grid.Row="9" Grid.RowSpan="9" VerticalScrollBarVisibility="Visible">
+            <ScrollViewer Margin="10,0,0,0" Grid.Column="1" Grid.Row="9" Grid.RowSpan="7" VerticalScrollBarVisibility="Visible">
                 <TextBlock x:Name="OutputBuffer"/>
             </ScrollViewer>
-            <Viewbox Grid.Column="3" Grid.Row="0" Grid.RowSpan="18">
-                <CaptureElement Name="CamPreviewControlL" VerticalAlignment="Center" Stretch="Uniform"/>
+            <TextBlock x:Name="MotorOutputBuffer" Margin="20,0,0,0" Grid.Column="1" Grid.Row="16"/>
+            <Viewbox Grid.Column="2" Grid.Row="0" Grid.RowSpan="18">
+            <CaptureElement Name="CamPreviewControlL" VerticalAlignment="Center" Stretch="Uniform"/>
             </Viewbox>
-            <Viewbox Grid.Column="4" Grid.Row="0" Grid.RowSpan="18">
+            <Viewbox Grid.Column="3" Grid.Row="0" Grid.RowSpan="18">
                 <CaptureElement Name="CamPreviewControlR" VerticalAlignment="Center" Stretch="Uniform"/>
             </Viewbox>
-            <Grid Grid.Column="3" Grid.Row="7" Grid.RowSpan="11">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="*"></RowDefinition>
-                    <RowDefinition Height="*"></RowDefinition>
-                    <RowDefinition Height="*"></RowDefinition>
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"></ColumnDefinition>
-                    <ColumnDefinition Width="*"></ColumnDefinition>
-                    <ColumnDefinition Width="*"></ColumnDefinition>
-                </Grid.ColumnDefinitions>
-            </Grid>
-            <ScrollViewer Margin="20,0,0,0" Grid.Column="2" Grid.Row="0" Grid.RowSpan="18" VerticalScrollBarVisibility="Visible">
-                <TextBlock x:Name="MotorOutputBuffer"/>
-            </ScrollViewer>
         </Grid>
     </Grid>
 </Page>
