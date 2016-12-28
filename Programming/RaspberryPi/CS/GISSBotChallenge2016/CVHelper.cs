@@ -30,6 +30,7 @@ namespace GISSBotChallenge2016
 
         private MediaCapture _mediaCapture;
         private CaptureElement _captureElement;
+        private LowLagPhotoCapture _lowLagCapture;
 
         private bool _isPreviewing;
 
@@ -50,10 +51,15 @@ namespace GISSBotChallenge2016
                 try
                 {
                     _mediaCapture = new MediaCapture();
-                    await _mediaCapture.InitializeAsync(new MediaCaptureInitializationSettings { VideoDeviceId = camera.Id });
+                    await _mediaCapture.InitializeAsync(new MediaCaptureInitializationSettings { VideoDeviceId = camera.Id, PhotoCaptureSource = PhotoCaptureSource.VideoPreview });
+                    //var res = new VideoEncodingProperties { Height = 360, Width = 640, Bitrate = 121651200, ProfileId = 0, Subtype = "YUY2" };
+                    //await _mediaCapture.VideoDeviceController.SetMediaStreamPropertiesAsync(MediaStreamType.VideoPreview, res);
+
+                    _lowLagCapture = await _mediaCapture.PrepareLowLagPhotoCaptureAsync(ImageEncodingProperties.CreateUncompressed(MediaPixelFormat.Bgra8));
                 }
-                catch (Exception)
+                catch (Exception e)
                 {
+                    Debug.WriteLine(e);
                     _mediaCapture = null;
                 }
             }
@@ -81,6 +87,7 @@ namespace GISSBotChallenge2016
 
         public void Dispose()
         {
+            Task.Run(async () => { await _lowLagCapture.FinishAsync(); });
             _mediaCapture.Dispose();
         }
 
@@ -90,10 +97,8 @@ namespace GISSBotChallenge2016
             {
                 try
                 {
-                    LowLagPhotoCapture lowLagCapture = await _mediaCapture.PrepareLowLagPhotoCaptureAsync(ImageEncodingProperties.CreateUncompressed(MediaPixelFormat.Bgra8));
-                    CapturedPhoto capturedPhoto = await lowLagCapture.CaptureAsync();
+                    CapturedPhoto capturedPhoto = await _lowLagCapture.CaptureAsync();
                     SoftwareBitmap swBmp = capturedPhoto.Frame.SoftwareBitmap;
-                    await lowLagCapture.FinishAsync();
                     return swBmp;
                 }
                 catch (COMException e)
@@ -134,7 +139,7 @@ namespace GISSBotChallenge2016
 
         // Graphics / Buffer helper functions
 
-        public unsafe int[,] GetColorDistribution(SoftwareBitmap haystack, Color needle, int[] tolerance, int sparcity=2)
+        public unsafe int[,] GetColorDistribution(SoftwareBitmap haystack, Color needle, int[] tolerance, int sparcity = 2)
         {
             int w = haystack.PixelWidth;
             int h = haystack.PixelHeight;
@@ -154,9 +159,9 @@ namespace GISSBotChallenge2016
 
             int pos;
 
-            for (int x = 0; x < w; x+=sparcity)
+            for (int x = 0; x < w; x += sparcity)
             {
-                for (int y = 0; y < h; y+=sparcity)
+                for (int y = 0; y < h; y += sparcity)
                 {
                     pos = bufferLayout.StartIndex + bufferLayout.Stride * y + 4 * x;
                     int rC = bufferData[pos + 2];
@@ -175,7 +180,7 @@ namespace GISSBotChallenge2016
             reference.Dispose();
             buffer.Dispose();
 
-            int[,] distributionArray = new int[dAPointer+1,2];
+            int[,] distributionArray = new int[dAPointer + 1, 2];
 
             for (int p = dAPointer; p >= 0; p--)
             {

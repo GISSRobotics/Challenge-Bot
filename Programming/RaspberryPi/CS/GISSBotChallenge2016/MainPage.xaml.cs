@@ -44,6 +44,7 @@ namespace GISSBotChallenge2016
         int[] buttonTimes = new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
         bool inRange = true;
         bool targetSet = false;
+        bool isAiming = false;
         int viewButtonLong = 30;
         bool manualMotorDrive = false;
         int loopsUntilMotorSend = 0;
@@ -52,14 +53,12 @@ namespace GISSBotChallenge2016
 
         private CVHelper _cvHelper;
 
-        //private CVHelper _cvHelper;
-        //Color sCol = Color.FromArgb(255, 210, 170, 10);  // Targeting search colour
-        //int[] sTol = new int[] { 32, 32, 32 };          // Search colour tolerances (RGB)
-        //int sSparcity = 4;                              // Spacing of pixels to search (higher = faster, lower = more accurate)
-
-        Color sCol = Color.FromArgb(255, 120, 10, 20);  // Targeting search colour
+        Color sCol = Color.FromArgb(255, 45, 135, 85);  // Targeting search colour
         int[] sTol = new int[] { 32, 32, 32 };          // Search colour tolerances (RGB)
         int sSparcity = 4;                              // Spacing of pixels to search (higher = faster, lower = more accurate)
+        // sSparcity of 4 seems to work quite well.
+
+        double[] targetTolerance = new double[] { 0.05, 0.05 };  // How centered the target should be (X and Y tolerances)
 
         private SerialHelper _serialHelper;
         ArduinoAmbassador arduino;
@@ -88,8 +87,6 @@ namespace GISSBotChallenge2016
             dispatcherTimer.Tick += DispatcherTimer_TickAsync;
             dispatcherTimer.Interval = new TimeSpan(100);
 
-            dispatcherTimer.Start();
-
         }
 
         private async void Application_ResumingAsync(object sender, object args)
@@ -98,7 +95,7 @@ namespace GISSBotChallenge2016
             var deviceList = await _serialHelper.GetSerialDevicesAsync();
             if (deviceList.Count() > 0)
             {
-                await _serialHelper.InitializeAsync(deviceList.First());
+                await _serialHelper.InitializeAsync(deviceList[2]);
                 arduino = new ArduinoAmbassador(_serialHelper);
             } else
             {
@@ -108,17 +105,19 @@ namespace GISSBotChallenge2016
             var camList = await _cvHelper.GetCamerasAsync();
             if (camList.Count() > 0)
             {
-                await _cvHelper.InitializeAsync(camList.First());
+                await _cvHelper.InitializeAsync(camList.Last());
             }
             else
             {
                 await _cvHelper.InitializeAsync(null);
             }
             await _cvHelper.StartPreviewAsync(CamPreviewControl);
+            dispatcherTimer.Start();
         }
 
         private async void Application_SuspendingAsync(object sender, object args)
         {
+            dispatcherTimer.Stop();
             try
             {
                 arduino.Dispose();
@@ -379,61 +378,23 @@ namespace GISSBotChallenge2016
 
                 if (functionRunning && functionRunningName.StartsWith("AIM"))
                 {
-                    // Aiming right now, so camera is needed
-
-                    // Get Frame
-                    // For some reason, this doesn't seem to always work!
-                    SoftwareBitmap camFrame = await _cvHelper.GetFrameAsync();
-                    if (camFrame != null)
+                    if (!isAiming)
                     {
-                        int[] size = new int[] { camFrame.PixelWidth, camFrame.PixelHeight };
-                        int[,] distributionArray = _cvHelper.GetColorDistribution(camFrame, sCol, sTol, sSparcity);
-                        int[] xDist = new int[distributionArray.Length / 2];
-                        int[] yDist = new int[distributionArray.Length / 2];
-                        SoftwareBitmap overlaySwBmp = new SoftwareBitmap(BitmapPixelFormat.Bgra8, size[0], size[1], BitmapAlphaMode.Premultiplied);
-                        for (int p = (distributionArray.Length / 2) - 1; p >= 0; p--)
+                        await CheckRobotAim_Async();
+                        if (targetSet)
                         {
-                            Color oCol = ColorHelper.FromArgb(255, (byte)(255 - sCol.R), (byte)(255 - sCol.G), (byte)(255 - sCol.B));
-                            _cvHelper.SetPixelColor(overlaySwBmp, distributionArray[p, 0], distributionArray[p, 1], oCol);
-                            xDist[p] = distributionArray[p, 0];
-                            yDist[p] = distributionArray[p, 1];
-                        }
-                        int xAvg;
-                        int yAvg;
-                        if (distributionArray.Length > 0)
-                        {
-                            xAvg = (int)Math.Round(xDist.Average());
-                            yAvg = (int)Math.Round(yDist.Average());
+                            if (functionRunningName == "AIM THEN FIRE")
+                            {
+                                SendCommand_Async("FIRE");
+                            }
+                            functionRunning = false;
+                            functionRunningName = "";
                         }
                         else
                         {
-                            xAvg = size[0] / 2;
-                            yAvg = size[1] / 2;
+                            AimRobot_Async();
                         }
-                        ComputeDisplay.Text = xAvg.ToString() + "," + yAvg.ToString();
-                        for (int x = xAvg - 4; x < xAvg + 4 && x < size[0]; x++)
-                        {
-                            if (x < 0) { continue; }
-                            for (int y = yAvg - 4; y < yAvg + 4 && y < size[1]; y++)
-                            {
-                                if (y < 0) { continue; }
-                                _cvHelper.SetPixelColor(overlaySwBmp, x, y, Colors.Red);
-                            }
-                        }
-                        var source = new SoftwareBitmapSource();
-                        await source.SetBitmapAsync(overlaySwBmp);
-                        CamOverlayControl.Source = source;
                     }
-                    // [ Is target within parameters? ]
-                    // [ If not, Define neccesary movement for t milliseconds ]
-                    // [ If so, targetSet = true ]
-
-                    // if function is AIM THEN FIRE:
-                    //  check arduino ammo, if any left then fire/
-                    //  if none left, end funtion
-                    //  if fired, continue function and loop again to ensure aim is still good
-                    // otherwise:
-                    //  end function
                 }
                 else
                 {
@@ -509,6 +470,92 @@ namespace GISSBotChallenge2016
             });
 
             arduino.WriteCommandAsync(command);
+        }
+
+        private async Task<double[]> CheckRobotAim_Async()
+        {
+            // Get Frame
+            // For some reason, this doesn't seem to always work: (I'm confused!)
+
+            // Exception thrown: 'System.Runtime.InteropServices.COMException' in GISSBotChallenge2016.exe
+            // System.Runtime.InteropServices.COMException(0xC00DABE4): The op is invalid.
+            //   PhotoState
+            //   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+            //   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+            //   at System.Runtime.CompilerServices.TaskAwaiter`1.GetResult()
+            //   at GISSBotChallenge2016.CVHelper.< GetFrameAsync > d__10.MoveNext()
+
+            targetSet = false;
+            SoftwareBitmap camFrame = await _cvHelper.GetFrameAsync();
+            if (camFrame != null)
+            {
+                int[] size = new int[] { camFrame.PixelWidth, camFrame.PixelHeight };
+                int[,] distributionArray = _cvHelper.GetColorDistribution(camFrame, sCol, sTol, sSparcity);
+                int[] xDist = new int[distributionArray.Length / 2];
+                int[] yDist = new int[distributionArray.Length / 2];
+                SoftwareBitmap overlaySwBmp = new SoftwareBitmap(BitmapPixelFormat.Bgra8, size[0], size[1], BitmapAlphaMode.Premultiplied);
+                for (int p = (distributionArray.Length / 2) - 1; p >= 0; p--)
+                {
+                    Color oCol = ColorHelper.FromArgb(255, (byte)(255 - sCol.R), (byte)(255 - sCol.G), (byte)(255 - sCol.B));
+                    _cvHelper.SetPixelColor(overlaySwBmp, distributionArray[p, 0], distributionArray[p, 1], oCol);
+                    xDist[p] = distributionArray[p, 0];
+                    yDist[p] = distributionArray[p, 1];
+                }
+                int xAvg;
+                int yAvg;
+                if (distributionArray.Length > 0)
+                {
+                    xAvg = (int)Math.Round(xDist.Average());
+                    yAvg = (int)Math.Round(yDist.Average());
+                }
+                else
+                {
+                    xAvg = size[0] / 2;
+                    yAvg = size[1] / 2;
+                }
+                for (int x = xAvg - 4; x < xAvg + 4 && x < size[0]; x++)
+                {
+                    if (x < 0) { continue; }
+                    for (int y = yAvg - 4; y < yAvg + 4 && y < size[1]; y++)
+                    {
+                        if (y < 0) { continue; }
+                        _cvHelper.SetPixelColor(overlaySwBmp, x, y, sCol);
+                    }
+                }
+                var source = new SoftwareBitmapSource();
+                await source.SetBitmapAsync(overlaySwBmp);
+                CamOverlayControl.Source = source;
+
+                // Normalize point to -1.0 -> +1.0 range
+                double[] target = new double[] { Math.Round(((double)xAvg / (double)size[0]) * 2 - 1, 3), Math.Round(((double)yAvg / (double)size[1]) * -2 + 1, 3) };
+
+                ComputeDisplay.Text = xAvg.ToString() + "," + yAvg.ToString() + "=" + target[0].ToString() + "," + target[1].ToString();
+
+                if (Math.Abs(target[0]) < targetTolerance[0] && Math.Abs(target[1]) < targetTolerance[1])
+                {
+                    targetSet = true;
+                }
+
+                return target;
+            }
+
+            return new double[] { 0, 0 };
+        }
+
+        private async void AimRobot_Async()
+        {
+            isAiming = true;
+            double[] target = await CheckRobotAim_Async();
+            if (!targetSet)
+            {
+                double mL = 0;
+                double mR = 0;
+                double[] mS = ComputeMotorSpeeds(target[0], target[1], 1);
+                mL = mS[0];
+                mR = mS[1];
+                SendCommand_Async("SETMOTORS " + mL.ToString() + "," + mR.ToString() + ",50");
+            }
+            isAiming = false;
         }
     }
 }
