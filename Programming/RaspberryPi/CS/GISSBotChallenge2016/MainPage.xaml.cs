@@ -383,6 +383,7 @@ namespace GISSBotChallenge2016
                         await CheckRobotAim_Async();
                         if (targetSet)
                         {
+                            SendCommand_Async("STOP");
                             if (functionRunningName == "AIM THEN FIRE")
                             {
                                 SendCommand_Async("FIRE");
@@ -472,6 +473,10 @@ namespace GISSBotChallenge2016
             arduino.WriteCommandAsync(command);
         }
 
+
+        // Aiming functions
+
+
         private async Task<double[]> CheckRobotAim_Async()
         {
             // Get Frame
@@ -548,12 +553,8 @@ namespace GISSBotChallenge2016
             double[] target = await CheckRobotAim_Async();
             if (!targetSet)
             {
-                double mL = 0;
-                double mR = 0;
-                double[] mS = ComputeMotorSpeeds(target[0], target[1], 1);
-                mL = mS[0];
-                mR = mS[1];
-                SendCommand_Async("SETMOTORS " + mL.ToString() + "," + mR.ToString() + ",50");
+                double[] mS = ComputeMotorSpeeds(target[0], -target[1], 1);
+                SendCommand_Async("SETMOTORS " + mS[0].ToString() + "," + mS[1].ToString() + ",50");
             }
             isAiming = false;
         }
