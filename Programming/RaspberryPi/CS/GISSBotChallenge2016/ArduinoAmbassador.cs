@@ -11,7 +11,7 @@ namespace GISSBotChallenge2016
         // Class for communicating with Arudino
         // Can also be used for simulation (requires more programming!)
 
-        public string buffer = "";
+        private string buffer = "";
 
         private SerialHelper _serialHelper;
 
