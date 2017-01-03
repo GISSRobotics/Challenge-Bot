@@ -39,7 +39,6 @@ namespace GISSBotChallenge2016
         Gamepad controller;
         DispatcherTimer dispatcherTimer;
 
-        bool functionRunning = false;
         string functionRunningName = "";
         int[] buttonTimes = new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
         bool inRange = true;
@@ -53,8 +52,10 @@ namespace GISSBotChallenge2016
 
         private CVHelper _cvHelper;
 
-        Color sCol = Color.FromArgb(255, 45, 135, 85);  // Targeting search colour
-        int[] sTol = new int[] { 32, 32, 32 };          // Search colour tolerances (RGB)
+        // 203
+
+        Color sCol = Color.FromArgb(255, 203, 88, 85);  // Targeting search colour
+        int[] sTol = new int[] { 18, 18, 20 };          // Search colour tolerances (RGB)
         int sSparcity = 4;                              // Spacing of pixels to search (higher = faster, lower = more accurate)
         // sSparcity of 4 seems to work quite well.
 
@@ -130,33 +131,30 @@ namespace GISSBotChallenge2016
             }
         }
 
-        private void Display(string text)
-        {
-            /*statusText.Text = text;*/
-        }
-
-        private void Gamepad_GamepadAdded(object sender, Gamepad e)
+        private async void Gamepad_GamepadAdded(object sender, Gamepad e)
         {
             // Stuff to do once controller is added
-            Display("Gamepad Added");
+
+            await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () => { AimButton.IsEnabled = false; });
+
             // Vibrate controller
-            Task.Delay(250).ContinueWith(_ => { e.Vibration = new GamepadVibration { LeftMotor = 0.5, RightMotor = 0.5, LeftTrigger = 0.5, RightTrigger = 0.5 }; });
-            Task.Delay(500).ContinueWith(_ => { e.Vibration = new GamepadVibration { LeftMotor = 0, RightMotor = 0, LeftTrigger = 0, RightTrigger = 0 }; });
+            await Task.Delay(250).ContinueWith(_ => { e.Vibration = new GamepadVibration { LeftMotor = 0.5, RightMotor = 0.5, LeftTrigger = 0.5, RightTrigger = 0.5 }; });
+            await Task.Delay(500).ContinueWith(_ => { e.Vibration = new GamepadVibration { LeftMotor = 0, RightMotor = 0, LeftTrigger = 0, RightTrigger = 0 }; });
         }
 
-        private void Gamepad_GamepadRemoved(object sender, Gamepad e)
+        private async void Gamepad_GamepadRemoved(object sender, Gamepad e)
         {
             // Stuff to do when the last controller is removed
             if (Gamepad.Gamepads.Count == 0)
             {
                 // STOP and set motor speeds to 0
-                Display("Gamepad Removed");
                 SendCommand_Async("STOP");
                 motorSpeeds = new double[] { 0, 0 };
                 SendCommand_Async("SETMOTORS 0,0");
                 // Not running any functions anymore
-                functionRunning = false;
                 functionRunningName = "";
+
+                await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () => { AimButton.IsEnabled = true; });
             }
         }
 
@@ -172,36 +170,41 @@ namespace GISSBotChallenge2016
                 }
             }
 
+            if (functionRunningName != "" && functionRunningName.StartsWith("AIM"))
+            {
+                if (!isAiming)
+                {
+                    if (targetSet)
+                    {
+                        SendCommand_Async("STOP");
+                        if (functionRunningName == "AIM THEN FIRE")
+                        {
+                            SendCommand_Async("FIRE");
+                            targetSet = false;
+                        }
+                        functionRunningName = "";
+                    }
+                    else
+                    {
+                        AimRobot_Async();
+                    }
+                }
+            }
+
             if (Gamepad.Gamepads.Count > 0)
             {
-                controller = Gamepad.Gamepads.First();                                              // Get the first controller
-                GamepadReading reading = controller.GetCurrentReading();                            // Get the controller's reading
-                GamepadButtons buttons = reading.Buttons;                                           // Get the button enum from this reading
+                controller = Gamepad.Gamepads.First();                                          // Get the first controller
+                GamepadReading reading = controller.GetCurrentReading();                        // Get the controller's reading
+                GamepadButtons buttons = reading.Buttons;                                       // Get the button enum from this reading
                 // Update button states on-screen
-                LeftThumbstickState.Text = "Left Stick: " + Math.Round(reading.LeftThumbstickX, 1) + ", " + Math.Round(reading.LeftThumbstickY, 1);
-                RightThumbstickState.Text = "Right Stick: " + Math.Round(reading.RightThumbstickX, 1) + ", " + Math.Round(reading.RightThumbstickY, 1);
-                LeftTriggerState.Text = "Left Trigger: " + Math.Round(reading.LeftTrigger, 1);
-                RightTriggerState.Text = "Right Trigger: " + Math.Round(reading.RightTrigger, 1);
-                LeftBumperState.Text = "Left Bumper: " + buttons.HasFlag(GamepadButtons.LeftShoulder);
-                RightBumperState.Text = "Right Bumper: " + buttons.HasFlag(GamepadButtons.RightShoulder);
-                MenuState.Text = "Menu: " + buttons.HasFlag(GamepadButtons.Menu).ToString();
-                ViewState.Text = "View: " + buttons.HasFlag(GamepadButtons.View).ToString();
-                LeftThumbButtonState.Text = "Left Stick Button: " + buttons.HasFlag(GamepadButtons.LeftThumbstick).ToString();
-                RightThumbButtonState.Text = "Right Stick Button: " + buttons.HasFlag(GamepadButtons.RightThumbstick).ToString();
-                DPadUpState.Text = "D-Pad Up: " + buttons.HasFlag(GamepadButtons.DPadUp).ToString();
-                DPadDownState.Text = "D-Pad Down: " + buttons.HasFlag(GamepadButtons.DPadDown).ToString();
-                DPadLeftState.Text = "D-Pad Left: " + buttons.HasFlag(GamepadButtons.DPadLeft).ToString();
-                DPadRightState.Text = "D-Pad Right: " + buttons.HasFlag(GamepadButtons.DPadRight).ToString();
-                AState.Text = "A: " + buttons.HasFlag(GamepadButtons.A).ToString();
-                BState.Text = "B: " + buttons.HasFlag(GamepadButtons.B).ToString();
-                XState.Text = "X: " + buttons.HasFlag(GamepadButtons.X).ToString();
-                YState.Text = "Y: " + buttons.HasFlag(GamepadButtons.Y).ToString();
+                DisplayControllerState(reading, buttons);
                 
                 // Controller Mapping
                 // ==================
-                // Left Stick       : Steering (X) [Acceleration (Y)?]
+                // Left Stick       : Steering (X) [Acceleration (Y)]
                 // Left Trigger     : Acceleration
                 // Right Trigger    : Deceleration
+
                 // D-Up             : Follow Line
                 // D-Down           : Goto Range
                 // D-Left           : Complete Auto
@@ -213,17 +216,15 @@ namespace GISSBotChallenge2016
                 // Y                : Record Go
                 // View             : Goto Start / Set Start
                 
-                // Button Handlers - Can this be made better?
-                // Maybe make event delegates and handlers?
+                // Button Handlers
                 if (buttons.HasFlag(GamepadButtons.DPadUp))
                 {
                     buttonTimes[0] += 1;
                 }
                 else if (buttonTimes[0] > 0)
                 {
-                    if (!functionRunning)
+                    if (functionRunningName == "")
                     {
-                        functionRunning = true;
                         functionRunningName = "FOLLOW";
                         SendCommand_Async("FOLLOW");
                     }
@@ -236,9 +237,8 @@ namespace GISSBotChallenge2016
                 }
                 else if (buttonTimes[1] > 0)
                 {
-                    if (!functionRunning)
+                    if (functionRunningName == "")
                     {
-                        functionRunning = true;
                         functionRunningName = "GOTO RANGE";
                         SendCommand_Async("GOTO RANGE");
                     }
@@ -251,11 +251,9 @@ namespace GISSBotChallenge2016
                 }
                 else if (buttonTimes[2] > 0)
                 {
-                    if (!functionRunning)
+                    if (functionRunningName == "")
                     {
-                        functionRunning = true;
                         functionRunningName = "COMPLETE";
-                        SendCommand_Async("[CompleteSeriesOfCommandsAndAutomation]");
                     }
                     buttonTimes[2] = 0;
                 }
@@ -266,11 +264,9 @@ namespace GISSBotChallenge2016
                 }
                 else if (buttonTimes[3] > 0)
                 {
-                    if (!functionRunning && inRange)
+                    if (functionRunningName == "" && inRange)
                     {
-                        functionRunning = true;
                         functionRunningName = "AIM THEN FIRE";
-                        SendCommand_Async("[AutoFire5SeriesOfCommandsAndAutomation]");
                     }
                     buttonTimes[3] = 0;
                 }
@@ -281,7 +277,7 @@ namespace GISSBotChallenge2016
                 }
                 else if (buttonTimes[4] > 0)
                 {
-                    if (!functionRunning && inRange)
+                    if (functionRunningName == "" && inRange)
                     {
                         // Fire
                         SendCommand_Async("FIRE");
@@ -295,11 +291,10 @@ namespace GISSBotChallenge2016
                 }
                 else if (buttonTimes[5] > 0)
                 {
-                    if (!functionRunning && inRange)
+                    if (functionRunningName == "" && inRange)
                     {
-                        functionRunning = true;
+                        targetSet = false;
                         functionRunningName = "AIM";
-                        SendCommand_Async("[AutoAimSeriesOfCommandsAndAutomation]");
                     }
                     buttonTimes[5] = 0;
                 }
@@ -310,10 +305,9 @@ namespace GISSBotChallenge2016
                 }
                 else if (buttonTimes[6] > 0)
                 {
-                    if (functionRunning)
+                    if (functionRunningName != "")
                     {
                         // Stop
-                        functionRunning = false;
                         functionRunningName = "";
                         SendCommand_Async("STOP");
                     }
@@ -326,15 +320,13 @@ namespace GISSBotChallenge2016
                 }
                 else if (buttonTimes[7] > 0)
                 {
-                    if (!functionRunning)
+                    if (functionRunningName == "")
                     {
-                        functionRunning = true;
                         functionRunningName = "RECORD";
                         SendCommand_Async("RECORD START");
                     }
                     else if (functionRunningName == "RECORD")
                     {
-                        functionRunning = false;
                         functionRunningName = "";
                         SendCommand_Async("RECORD STOP");
                     }
@@ -347,9 +339,8 @@ namespace GISSBotChallenge2016
                 }
                 else if (buttonTimes[8] > 0)
                 {
-                    if (!functionRunning)
+                    if (functionRunningName == "")
                     {
-                        functionRunning = true;
                         functionRunningName = "RECORD GO";
                         SendCommand_Async("RECORD GO");
                     }
@@ -359,7 +350,7 @@ namespace GISSBotChallenge2016
                 if (buttons.HasFlag(GamepadButtons.View))
                 {
                     buttonTimes[9] += 1;
-                    if (!functionRunning && buttonTimes[9] == viewButtonLong)
+                    if (functionRunningName == "" && buttonTimes[9] == viewButtonLong)
                     {
                         // Set START
                         SendCommand_Async("SETSTART");
@@ -367,37 +358,14 @@ namespace GISSBotChallenge2016
                 }
                 else if (buttonTimes[9] > 0)
                 {
-                    if (!functionRunning && buttonTimes[9] < viewButtonLong)
+                    if (functionRunningName == "" && buttonTimes[9] < viewButtonLong)
                     {
-                        functionRunning = true;
                         functionRunningName = "GOTO START";
                         SendCommand_Async("GOTO START");
                     }
                     buttonTimes[9] = 0;
                 }
-
-                if (functionRunning && functionRunningName.StartsWith("AIM"))
-                {
-                    if (!isAiming)
-                    {
-                        await CheckRobotAim_Async();
-                        if (targetSet)
-                        {
-                            SendCommand_Async("STOP");
-                            if (functionRunningName == "AIM THEN FIRE")
-                            {
-                                SendCommand_Async("FIRE");
-                            }
-                            functionRunning = false;
-                            functionRunningName = "";
-                        }
-                        else
-                        {
-                            AimRobot_Async();
-                        }
-                    }
-                }
-                else
+                if (functionRunningName == "")
                 {
 
                     motorSpeeds = new double[] { 0, 0 };
@@ -524,7 +492,7 @@ namespace GISSBotChallenge2016
                     for (int y = yAvg - 4; y < yAvg + 4 && y < size[1]; y++)
                     {
                         if (y < 0) { continue; }
-                        _cvHelper.SetPixelColor(overlaySwBmp, x, y, sCol);
+                        _cvHelper.SetPixelColor(overlaySwBmp, x, y, Colors.White);
                     }
                 }
                 var source = new SoftwareBitmapSource();
@@ -557,6 +525,40 @@ namespace GISSBotChallenge2016
                 SendCommand_Async("SETMOTORS " + mS[0].ToString() + "," + mS[1].ToString() + ",50");
             }
             isAiming = false;
+        }
+
+        private void DisplayControllerState(GamepadReading reading, GamepadButtons buttons)
+        {
+            LeftThumbstickState.Text = "Left Stick: " + Math.Round(reading.LeftThumbstickX, 1) + ", " + Math.Round(reading.LeftThumbstickY, 1);
+            RightThumbstickState.Text = "Right Stick: " + Math.Round(reading.RightThumbstickX, 1) + ", " + Math.Round(reading.RightThumbstickY, 1);
+            LeftTriggerState.Text = "Left Trigger: " + Math.Round(reading.LeftTrigger, 1);
+            RightTriggerState.Text = "Right Trigger: " + Math.Round(reading.RightTrigger, 1);
+            LeftBumperState.Text = "Left Bumper: " + buttons.HasFlag(GamepadButtons.LeftShoulder);
+            RightBumperState.Text = "Right Bumper: " + buttons.HasFlag(GamepadButtons.RightShoulder);
+            MenuState.Text = "Menu: " + buttons.HasFlag(GamepadButtons.Menu).ToString();
+            ViewState.Text = "View: " + buttons.HasFlag(GamepadButtons.View).ToString();
+            LeftThumbButtonState.Text = "Left Stick Button: " + buttons.HasFlag(GamepadButtons.LeftThumbstick).ToString();
+            RightThumbButtonState.Text = "Right Stick Button: " + buttons.HasFlag(GamepadButtons.RightThumbstick).ToString();
+            DPadUpState.Text = "D-Pad Up: " + buttons.HasFlag(GamepadButtons.DPadUp).ToString();
+            DPadDownState.Text = "D-Pad Down: " + buttons.HasFlag(GamepadButtons.DPadDown).ToString();
+            DPadLeftState.Text = "D-Pad Left: " + buttons.HasFlag(GamepadButtons.DPadLeft).ToString();
+            DPadRightState.Text = "D-Pad Right: " + buttons.HasFlag(GamepadButtons.DPadRight).ToString();
+            AState.Text = "A: " + buttons.HasFlag(GamepadButtons.A).ToString();
+            BState.Text = "B: " + buttons.HasFlag(GamepadButtons.B).ToString();
+            XState.Text = "X: " + buttons.HasFlag(GamepadButtons.X).ToString();
+            YState.Text = "Y: " + buttons.HasFlag(GamepadButtons.Y).ToString();
+        }
+
+        private void AimButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (functionRunningName == "")
+            {
+                functionRunningName = "AIM";
+            }
+            else
+            {
+                functionRunningName = "";
+            }
         }
     }
 }

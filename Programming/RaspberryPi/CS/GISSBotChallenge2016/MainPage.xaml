@@ -48,7 +48,10 @@
             <TextBlock x:Name="DPadDownState" Grid.Row="11" Text="Waiting..."/>
             <TextBlock x:Name="DPadLeftState" Grid.Row="12" Text="Waiting..."/>
             <TextBlock x:Name="DPadRightState" Grid.Row="13" Text="Waiting..."/>
-            <TextBlock x:Name="AState" Grid.Row="14" Text="Waiting..."/>
+            <StackPanel Orientation="Horizontal" Grid.Row="14">
+                <TextBlock x:Name="AState" Text="Waiting..."/>
+                <Button Name="AimButton" Content="Toggle Aim Function" Click="AimButton_Click" />
+            </StackPanel>
             <TextBlock x:Name="BState" Grid.Row="15" Text="Waiting..."/>
             <TextBlock x:Name="XState" Grid.Row="16" Text="Waiting..."/>
             <TextBlock x:Name="YState" Grid.Row="17" Text="Waiting..."/>

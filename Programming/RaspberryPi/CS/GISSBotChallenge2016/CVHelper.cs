@@ -52,8 +52,15 @@ namespace GISSBotChallenge2016
                 {
                     _mediaCapture = new MediaCapture();
                     await _mediaCapture.InitializeAsync(new MediaCaptureInitializationSettings { VideoDeviceId = camera.Id, PhotoCaptureSource = PhotoCaptureSource.VideoPreview });
-                    //var res = new VideoEncodingProperties { Height = 360, Width = 640, Bitrate = 121651200, ProfileId = 0, Subtype = "YUY2" };
-                    //await _mediaCapture.VideoDeviceController.SetMediaStreamPropertiesAsync(MediaStreamType.VideoPreview, res);
+                    try
+                    {
+                        var res = new VideoEncodingProperties { Height = 360, Width = 640, Bitrate = 121651200, ProfileId = 0, Subtype = "YUY2" };
+                        await _mediaCapture.VideoDeviceController.SetMediaStreamPropertiesAsync(MediaStreamType.VideoPreview, res);
+                    }
+                    catch
+                    {
+
+                    }
 
                     _lowLagCapture = await _mediaCapture.PrepareLowLagPhotoCaptureAsync(ImageEncodingProperties.CreateUncompressed(MediaPixelFormat.Bgra8));
                 }
